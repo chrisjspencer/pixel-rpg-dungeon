@@ -26,9 +26,17 @@ for (let g = 0; g < 200; g++) {
 }
 for (const c of Object.keys(L.CLASSES)) {
   const q = L.newPlayer(c);
-  q.inv.push(L.CLASSES[c].weapon, 'sword');
+  q.inv.push(L.CLASSES[c].weapon);
   L.useItem(q, 0);
-  assert(q.weapon >= 4, c + ' mastery');
+  assert.strictEqual(q.weapon, 1, c + ' matching weapon bonus');
+  if (c === 'wizard') assert.strictEqual(q.spellBonus, 1, 'wand spell bonus');
+}
+{
+  const q = L.newPlayer('wizard');
+  q.inv.push('sword');
+  L.useItem(q, 0);
+  assert.strictEqual(q.weapon, 0, 'nonmatching weapon has no attack bonus');
+  assert.strictEqual(q.spellBonus, 0, 'nonmatching wand bonus is not applied');
 }
 {
   const lv = L.generateLevel(1), q = L.newPlayer('archer');
@@ -62,4 +70,43 @@ console.log('all tests passed');
   lv = open(); lv.enemies.push({ type: 'goblin', name: 'Goblin Archer', x: 4, y: 1, hp: 7, maxHp: 7, atk: 4, xp: 1 });
   const hp = w.hp; L.enemyTurn(w, lv);
   assert(w.hp < hp && lv.enemies[0].x === 4, 'goblin shoots at range');
+}
+{
+  const open = () => ({ map: Array.from({ length: 11 }, (_, y) => Array.from({ length: 15 }, (_, x) => (x === 0 || y === 0 || x === 14 || y === 10 ? 1 : 0))), enemies: [], items: [], floor: 1, stairs: null });
+  const p = L.newPlayer('wizard'); p.baseAtk = 20; p.x = 1; p.y = 1;
+  const lv = open();
+  lv.enemies.push({ type: 'rat', name: 'Rat', x: 3, y: 1, hp: 100, maxHp: 100, atk: 1, xp: 1 });
+  const mp = p.mp, hp = lv.enemies[0].hp;
+  L.playerShoot(p, lv, 1, 0);
+  assert.strictEqual(p.mp, mp - 1, 'wizard ranged attack costs one mana');
+  assert(lv.enemies[0].hp <= hp - 19 && lv.enemies[0].hp >= hp - 21, 'wizard ranged damage fades with distance');
+}
+{
+  const open = () => ({ map: Array.from({ length: 11 }, (_, y) => Array.from({ length: 15 }, (_, x) => (x === 0 || y === 0 || x === 14 || y === 10 ? 1 : 0))), enemies: [], items: [], floor: 1, stairs: null });
+  const p = L.newPlayer('wizard'), lv = open();
+  lv.enemies.push({ type: 'rat', name: 'Rat', x: 2, y: 1, hp: 100, maxHp: 100, atk: 1, xp: 1 });
+  const hp = lv.enemies[0].hp, mp = p.mp;
+  L.playerMove(p, lv, 1, 0);
+  assert(lv.enemies[0].hp < hp - 1, 'wizard close attack deals full power');
+  assert.strictEqual(p.mp, mp - 1, 'wizard close attack costs one mana');
+  p.mp = 0;
+  const noMana = L.playerShoot(p, lv, 1, 0);
+  assert.strictEqual(noMana.acted, false, 'wizard cannot attack without mana');
+}
+{
+  const p = L.newPlayer('wizard');
+  const lv = { enemies: [{ type: 'rat', name: 'Rat', x: 2, y: 1, hp: 100, maxHp: 100, atk: 1, xp: 1 }], floor: 1 };
+  L.castSpell(p, lv);
+  assert.strictEqual(lv.enemies[0].hp, 88, 'wizard spells deal double damage');
+}
+{
+  const p = L.newPlayer('fighter');
+  p.inv.push('potion', 'wand');
+  const lv = { enemies: [{ type: 'rat', name: 'Rat', hp: 1, xp: 4, gold: 2 }], floor: 1 };
+  const msgs = [];
+  L.damageEnemy(p, lv, lv.enemies[0], 1, msgs);
+  assert.strictEqual(p.gold, 2, 'enemy kill awards gold');
+  assert.strictEqual(L.cashOutInventory(p), 15, 'remaining inventory converts to gold');
+  assert.strictEqual(p.gold, 17, 'cash-out adds to player gold');
+  assert.strictEqual(p.inv.length, 0, 'cash-out removes sold inventory');
 }
