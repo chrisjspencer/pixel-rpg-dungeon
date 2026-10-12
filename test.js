@@ -70,6 +70,9 @@ assert.strictEqual(p.level, 2);
   const shot = L.playerShoot(p, lv, 1, 0);
   assert.deepStrictEqual(shot.shotPath, [[2, 1], [3, 1], [4, 1]], 'shot path ends at the first enemy');
   assert(lv.enemies[0].hp <= 100 - 9, 'distant shot full');
+  lv = open();
+  const outOfRange = L.playerShoot(p, lv, 1, 0);
+  assert.deepStrictEqual(outOfRange.shotPath, [[2, 1], [3, 1], [4, 1]], 'archer range is three tiles');
   lv = open(); lv.map[3][1] = 1;
   const blocked = L.playerShoot(p, lv, 0, 1);
   assert.deepStrictEqual(blocked.shotPath, [[1, 2]], 'shot path stops before a wall');
@@ -81,12 +84,17 @@ assert.strictEqual(p.level, 2);
 {
   const open = () => ({ map: Array.from({ length: 11 }, (_, y) => Array.from({ length: 15 }, (_, x) => (x === 0 || y === 0 || x === 14 || y === 10 ? 1 : 0))), enemies: [], items: [], floor: 1, stairs: null });
   const p = L.newPlayer('wizard'); p.baseAtk = 20; p.x = 1; p.y = 1;
-  const lv = open();
+  let lv = open();
   lv.enemies.push({ type: 'rat', name: 'Rat', x: 3, y: 1, hp: 100, maxHp: 100, atk: 1, xp: 1 });
   const mp = p.mp, hp = lv.enemies[0].hp;
   L.playerShoot(p, lv, 1, 0);
-  assert.strictEqual(p.mp, mp - 1, 'wizard ranged attack costs one mana');
-  assert(lv.enemies[0].hp <= hp - 18 && lv.enemies[0].hp >= hp - 20, 'wizard ranged damage fades with distance');
+  assert.strictEqual(p.mp, mp, 'wizard basic bolt costs no mana');
+  assert(lv.enemies[0].hp <= hp - 8 && lv.enemies[0].hp >= hp - 10, 'wizard basic bolt deals reduced damage');
+  p.mp = 0;
+  lv = open();
+  lv.enemies.push({ type: 'rat', name: 'Rat', x: 6, y: 1, hp: 100, maxHp: 100, atk: 1, xp: 1 });
+  const longShot = L.playerShoot(p, lv, 1, 0);
+  assert.deepStrictEqual(longShot.shotPath, [[2, 1], [3, 1], [4, 1], [5, 1], [6, 1]], 'wizard bolt retains five-tile range');
 }
 {
   const open = () => ({ map: Array.from({ length: 11 }, (_, y) => Array.from({ length: 15 }, (_, x) => (x === 0 || y === 0 || x === 14 || y === 10 ? 1 : 0))), enemies: [], items: [], floor: 1, stairs: null });
@@ -99,11 +107,19 @@ assert.strictEqual(p.level, 2);
   assert.strictEqual(p.mp, mp - 1, 'wizard close attack costs one mana');
   p.mp = 0;
   const noMana = L.playerShoot(p, lv, 1, 0);
-  assert.strictEqual(noMana.acted, false, 'wizard cannot attack without mana');
+  assert.strictEqual(noMana.acted, true, 'wizard can fire a basic bolt without mana');
+  assert.strictEqual(p.mp, 0, 'basic bolt remains mana-free at zero mana');
   p.mp = 2;
   const blockedMp = p.mp;
   L.playerShoot(p, lv, -1, 0);
-  assert.strictEqual(p.mp, blockedMp, 'blocked shot does not cost mana');
+  assert.strictEqual(p.mp, blockedMp, 'blocked shot does not alter mana');
+}
+{
+  const base = L.makeEnemy('rat', 1, 1, 1);
+  const later = L.makeEnemy('rat', 1, 1, 5);
+  assert.strictEqual(base.hp, 5, 'floor-one enemy has base health');
+  assert.strictEqual(later.hp, 17, 'regular enemy health rises by three per later floor');
+  assert.strictEqual(later.maxHp, later.hp, 'scaled max health matches scaled health');
 }
 {
   const p = L.newPlayer('wizard');
