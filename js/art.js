@@ -24,7 +24,9 @@ const SPRITES = {
   archer: ['..GGGG..','.GssssG.','.GskksG.','..GGGG..','.GGnnGG.','sGGGGGGs','.GGGGGG.','.nn..nn.'],
   wizard: ['...pp...','..pppp..','.pssssp.','.pskksp.','.pppppp.','spyppyps','.pppppp.','.pp..pp.'],
   armor: ['.cc..cc.','cccccccc','cwcccwcc','cccccccc','.cccccc.','.cccccc.','.cc..cc.','........'],
-  spark: ['........','..o..o..','...oo...','.oo..oo.','.oo..oo.','...oo...','..o..o..','........']
+  spark: ['........','..o..o..','...oo...','.oo..oo.','.oo..oo.','...oo...','..o..o..','........'],
+  arrow: ['........','........','....n...','nnnnwwww','....n...','........','........','........'],
+  bolt:  ['........','...b....','..bwb...','.bwwb...','..bwb...','...b....','........','........']
 };
 
 function buildTextures(scene) {
