@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#14101e">
+<title>Pixel Dungeon RPG</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+  <div id="hud">
+    <div class="row"><span id="floor">Floor 1</span><span id="lvl">Lv 1</span><span id="stats">ATK 3 DEF 0</span></div>
+    <div class="bar hp"><div id="hpFill"></div><span id="hpText"></span></div>
+    <div class="bar mp"><div id="mpFill"></div><span id="mpText"></span></div>
+    <div class="bar xp"><div id="xpFill"></div><span id="xpText"></span></div>
+  </div>
+  <div id="game"></div>
+  <div id="log"></div>
+  <div id="controls">
+    <div id="dpad">
+      <button data-dir="up" class="up" aria-label="Up">▲</button>
+      <button data-dir="left" class="left" aria-label="Left">◀</button>
+      <button data-dir="wait" class="mid" aria-label="Wait">•</button>
+      <button data-dir="right" class="right" aria-label="Right">▶</button>
+      <button data-dir="down" class="down" aria-label="Down">▼</button>
+    </div>
+    <div id="actions">
+      <button id="spellBtn">🔥 Spell<br><small>4 MP</small></button>
+      <button id="bagBtn">🎒 Bag<br><small id="bagCount">0/8</small></button>
+    </div>
+  </div>
+  <div id="inventory" class="overlay hidden">
+    <div class="panel">
+      <h2>Inventory</h2>
+      <div id="invList"></div>
+      <button id="closeBag">Close</button>
+    </div>
+  </div>
+  <div id="message" class="overlay hidden">
+    <div class="panel">
+      <h2 id="msgTitle"></h2>
+      <p id="msgText"></p>
+      <button id="msgBtn">Play again</button>
+    </div>
+  </div>
+</div>
+<script src="lib/phaser.min.js"></script>
+<script src="js/art.js"></script>
+<script src="js/logic.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
