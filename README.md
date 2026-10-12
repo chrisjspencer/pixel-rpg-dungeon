@@ -2,6 +2,8 @@
 
 A small turn-based pixel dungeon crawler built with **Phaser 3** and vanilla JavaScript. It runs in any modern browser and is designed for phones (touch controls, responsive layout).
 
+[Play the game](https://chrisjspencer.github.io/pixel-rpg-dungeon/)
+
 ## How to play
 Descend through 5 floors and defeat the **Dungeon Lord** on floor 5.
 
