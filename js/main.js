@@ -1,7 +1,7 @@
 const TILE = 16;
 const $ = (id) => document.getElementById(id);
 
-let player, level, floorNum, gameOver, scene;
+let player, level, floorNum, gameOver, scene, aiming = false;
 let logLines = [];
 
 function log(msgs) {
@@ -49,6 +49,7 @@ function chooseClass() {
 }
 
 function startGame(cls) {
+  setAiming(false);
   player = newPlayer(cls);
   floorNum = 1;
   gameOver = false;
@@ -83,7 +84,7 @@ function endTurn(result) {
   } else {
     const enemyMsgs = enemyTurn(player, level);
     msgs.push(...enemyMsgs);
-    if (enemyMsgs.some((msg) => msg.includes(' hits you for '))) DungeonAudio.hurt();
+    if (enemyMsgs.some((msg) => / (hits|shoots) you for /.test(msg))) DungeonAudio.hurt();
     regen(player);
   }
   if (result.msgs.some((msg) => msg.startsWith('Picked up '))) DungeonAudio.pickup();
@@ -97,8 +98,24 @@ function endTurn(result) {
   }
 }
 
+function setAiming(on) {
+  aiming = on;
+  document.querySelectorAll('#dpad button').forEach((b) => b.classList.toggle('aim', on && b.dataset.dir !== 'wait'));
+}
+
 function act(dx, dy) {
   if (gameOver || !$('inventory').classList.contains('hidden')) return;
+  if (aiming) {
+    setAiming(false);
+    if (dx !== 0 || dy !== 0) {
+      const s = playerShoot(player, level, dx, dy);
+      if (!s.acted) return;
+      if (s.hitX !== undefined) { scene.flash(s.hitX, s.hitY); DungeonAudio.attack(); }
+      endTurn(s);
+    }
+    return;
+  }
+  if (dx === 0 && dy === 0 && player.cls === 'archer') { setAiming(true); log(['Aim: press a direction to shoot.']); return; }
   const r = playerMove(player, level, dx, dy);
   if (!r.acted) return;
   if (r.hitX !== undefined) { scene.flash(r.hitX, r.hitY); DungeonAudio.attack(); }

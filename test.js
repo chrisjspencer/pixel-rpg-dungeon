@@ -47,3 +47,19 @@ const p = L.newPlayer();
 L.gainXp(p, 10);
 assert.strictEqual(p.level, 2);
 console.log('all tests passed');
+
+// Archer: shots deal half damage when adjacent, full at range; ranged enemies shoot.
+{
+  const open = () => ({ map: Array.from({ length: 11 }, (_, y) => Array.from({ length: 15 }, (_, x) => (x === 0 || y === 0 || x === 14 || y === 10 ? 1 : 0))), enemies: [], items: [], floor: 1, stairs: null });
+  const p = L.newPlayer('archer'); p.baseAtk = 10; p.x = 1; p.y = 1;
+  let lv = open(); lv.enemies.push({ type: 'rat', name: 'Rat', x: 2, y: 1, hp: 100, maxHp: 100, atk: 1, xp: 1 });
+  L.playerShoot(p, lv, 1, 0);
+  assert(lv.enemies[0].hp >= 100 - 6 && lv.enemies[0].hp <= 100 - 4, 'adjacent shot halved');
+  lv = open(); lv.enemies.push({ type: 'rat', name: 'Rat', x: 4, y: 1, hp: 100, maxHp: 100, atk: 1, xp: 1 });
+  L.playerShoot(p, lv, 1, 0);
+  assert(lv.enemies[0].hp <= 100 - 9, 'distant shot full');
+  const w = L.newPlayer('fighter'); w.x = 1; w.y = 1;
+  lv = open(); lv.enemies.push({ type: 'goblin', name: 'Goblin Archer', x: 4, y: 1, hp: 7, maxHp: 7, atk: 4, xp: 1 });
+  const hp = w.hp; L.enemyTurn(w, lv);
+  assert(w.hp < hp && lv.enemies[0].x === 4, 'goblin shoots at range');
+}
