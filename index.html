@@ -19,11 +19,15 @@
   <div id="log"></div>
   <div id="controls">
     <div id="dpad">
+      <button data-dir="ul" class="ul" aria-label="Up left">◤</button>
       <button data-dir="up" class="up" aria-label="Up">▲</button>
+      <button data-dir="ur" class="ur" aria-label="Up right">◥</button>
       <button data-dir="left" class="left" aria-label="Left">◀</button>
       <button data-dir="wait" class="mid" aria-label="Wait">•</button>
       <button data-dir="right" class="right" aria-label="Right">▶</button>
+      <button data-dir="dl" class="dl" aria-label="Down left">◣</button>
       <button data-dir="down" class="down" aria-label="Down">▼</button>
+      <button data-dir="dr" class="dr" aria-label="Down right">◢</button>
     </div>
     <div id="actions">
       <button id="spellBtn">🔥 Spell<br><small>4 MP</small></button>
@@ -35,6 +39,12 @@
       <h2>Inventory</h2>
       <div id="invList"></div>
       <button id="closeBag">Close</button>
+    </div>
+  </div>
+  <div id="classSelect" class="overlay hidden">
+    <div class="panel">
+      <h2>Choose your hero</h2>
+      <div id="classes"></div>
     </div>
   </div>
   <div id="message" class="overlay hidden">

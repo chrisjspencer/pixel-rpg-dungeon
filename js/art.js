@@ -17,6 +17,11 @@ const SPRITES = {
   potion: ['...nn...','...ww...','..wrrw..','.wrrrrw.','.wrrrrw.','.wrrrrw.','..wwww..','........'],
   mana: ['...nn...','...ww...','..wbbw..','.wbbbbw.','.wbbbbw.','.wbbbbw.','..wwww..','........'],
   sword: ['......cc','.....cwc','....cwc.','...cwc..','n.cwc...','.nwc....','.nn.....','nn......'],
+  bow: ['..n.....','.n.w....','n..w....','n...w...','n...w...','n..w....','.n.w....','..n.....'],
+  wand: ['......yy','.....yy.','....nn..','...nn...','..nn....','.nn.....','nn......','n.......'],
+  fighter: ['..cccc..','.cssssc.','.cskksc.','..cccc..','.rrccrr.','srrrrrrs','.rrrrrr.','.nn..nn.'],
+  archer: ['..GGGG..','.GssssG.','.GskksG.','..GGGG..','.GGnnGG.','sGGGGGGs','.GGGGGG.','.nn..nn.'],
+  wizard: ['...pp...','..pppp..','.pssssp.','.pskksp.','.pppppp.','spyppyps','.pppppp.','.pp..pp.'],
   armor: ['.cc..cc.','cccccccc','cwcccwcc','cccccccc','.cccccc.','.cccccc.','.cc..cc.','........'],
   spark: ['........','..o..o..','...oo...','.oo..oo.','.oo..oo.','...oo...','..o..o..','........']
 };

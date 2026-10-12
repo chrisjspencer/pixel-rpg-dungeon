@@ -16,7 +16,8 @@ html, body { margin: 0; height: 100%; background: #14101e; color: #eee; font-fam
 button { font: inherit; color: #fff; background: #3b3158; border: 2px solid #6b5a99; border-radius: 8px; cursor: pointer; }
 button:active { background: #5a4a8a; }
 #dpad button { font-size: 20px; }
-.up { grid-area: 1/2; } .left { grid-area: 2/1; } .mid { grid-area: 2/2; } .right { grid-area: 2/3; } .down { grid-area: 3/2; }
+.up { grid-area: 1/2; } .left { grid-area: 2/1; } .mid { grid-area: 2/2; } .right { grid-area: 2/3; } .down { grid-area: 3/2; } .ul { grid-area: 1/1; } .ur { grid-area: 1/3; } .dl { grid-area: 3/1; } .dr { grid-area: 3/3; }
+#classes button { display: block; width: 100%; padding: 10px; margin: 4px 0; text-align: left; }
 #actions { display: flex; flex-direction: column; gap: 10px; }
 #actions button { width: 92px; height: 68px; font-size: 15px; }
 #actions button:disabled { opacity: .4; }
