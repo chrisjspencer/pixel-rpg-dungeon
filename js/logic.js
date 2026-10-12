@@ -14,7 +14,6 @@ const CLASSES = {
   archer:  { name: 'Archer',  desc: 'Nimble, great with bows',   sprite: 'archer',  hp: 20, mp: 6, atk: 3, weapon: 'bow' },
   wizard:  { name: 'Wizard',  desc: 'Frail, great with wands',   sprite: 'wizard',  hp: 16, mp: 12, atk: 2, weapon: 'wand' }
 };
-const PLAYER_RANGE = 5;
 const WEAPON_MATCH = 1, WEAPON_OFF = 0;
 
 const ITEM_TYPES = {
@@ -35,6 +34,7 @@ function newPlayer(cls) {
 const playerAtk = (p) => p.baseAtk + p.weapon;
 const playerDef = (p) => p.armor;
 const xpNeeded = (p) => p.level * 10;
+const ARCHER_RANGE = 3, WIZARD_RANGE = 5;
 
 // Returns the list of walkable cells reachable from (sx, sy) with their distance.
 function floodFill(map, sx, sy) {
@@ -106,7 +106,7 @@ function generateLevel(floor) {
 function makeEnemy(type, x, y, floor) {
   const t = ENEMY_TYPES[type];
   const scale = type === 'boss' ? 0 : floor - 1;
-  return { type, name: t.name, x, y, hp: t.hp + scale * 2, maxHp: t.hp + scale * 2, atk: t.atk + Math.floor(scale / 2), xp: t.xp + scale, gold: t.gold + scale, sprite: t.sprite };
+  return { type, name: t.name, x, y, hp: t.hp + scale * 3, maxHp: t.hp + scale * 3, atk: t.atk + Math.floor(scale / 2), xp: t.xp + scale, gold: t.gold + scale, sprite: t.sprite };
 }
 
 const inBounds = (lv, x, y) => lv.map[y] !== undefined && lv.map[y][x] === 0;
@@ -171,11 +171,10 @@ function playerShoot(p, lv, dx, dy) {
   const msgs = [];
   if ((p.cls !== 'archer' && p.cls !== 'wizard') || (dx === 0 && dy === 0)) return { acted: false, msgs };
   if (!inBounds(lv, p.x + dx, p.y + dy)) return { acted: false, msgs };
-  if (p.cls === 'wizard' && p.mp < WIZARD_ATTACK_COST) return { acted: false, msgs: ['Not enough mana to attack.'] };
-  if (p.cls === 'wizard') p.mp -= WIZARD_ATTACK_COST;
   let x = p.x, y = p.y;
   const shotPath = [];
-  for (let d = 1; d <= PLAYER_RANGE; d++) {
+  const range = p.cls === 'archer' ? ARCHER_RANGE : WIZARD_RANGE;
+  for (let d = 1; d <= range; d++) {
     const nx = x + dx, ny = y + dy;
     if (!inBounds(lv, nx, ny)) break;
     x = nx; y = ny;
@@ -184,7 +183,7 @@ function playerShoot(p, lv, dx, dy) {
     if (!e) continue;
     let dmg = Math.max(1, playerAtk(p) + rnd(3) - 1);
     if (p.cls === 'archer' && d === 1) dmg = Math.max(1, Math.floor(dmg / 2));
-    if (p.cls === 'wizard') dmg = Math.max(1, dmg - d + 1);
+    if (p.cls === 'wizard') dmg = Math.max(1, Math.floor((dmg - d + 1) / 2));
     msgs.push((p.cls === 'wizard' ? 'Your bolt hits ' : 'Your arrow hits ') + e.name + ' for ' + dmg + '.');
     damageEnemy(p, lv, e, dmg, msgs);
     return { acted: true, msgs, hitX: x, hitY: y, shotPath, won: lv.floor === MAX_FLOOR && !lv.enemies.some((q) => q.type === 'boss') };
@@ -288,5 +287,5 @@ function regen(p) {
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { CLASSES, ITEM_TYPES, generateLevel, newPlayer, playerMove, playerShoot, castSpell, useItem, cashOutInventory, enemyTurn, regen, gainXp, MAP_W, MAP_H, MAX_FLOOR };
+  module.exports = { CLASSES, ITEM_TYPES, generateLevel, makeEnemy, newPlayer, playerMove, playerShoot, castSpell, useItem, cashOutInventory, enemyTurn, regen, gainXp, MAP_W, MAP_H, MAX_FLOOR };
 }
