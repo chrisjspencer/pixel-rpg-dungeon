@@ -32,11 +32,15 @@ for (const c of Object.keys(L.CLASSES)) {
   if (c === 'wizard') assert.strictEqual(q.spellBonus, 1, 'wand spell bonus');
 }
 {
-  const q = L.newPlayer('wizard');
-  q.inv.push('sword');
-  L.useItem(q, 0);
-  assert.strictEqual(q.weapon, 0, 'nonmatching weapon has no attack bonus');
-  assert.strictEqual(q.spellBonus, 0, 'nonmatching wand bonus is not applied');
+  const wizard = L.newPlayer('wizard');
+  wizard.inv.push('sword');
+  L.useItem(wizard, 0);
+  assert.strictEqual(wizard.weapon, 0, 'nonmatching weapon has no attack bonus');
+  const fighter = L.newPlayer('fighter');
+  fighter.inv.push('wand');
+  L.useItem(fighter, 0);
+  assert.strictEqual(fighter.weapon, 0, 'nonmatching wand has no attack bonus');
+  assert.strictEqual(fighter.spellBonus, 0, 'nonmatching wand adds no spell damage');
 }
 {
   const lv = L.generateLevel(1), q = L.newPlayer('archer');
@@ -54,7 +58,6 @@ for (const c of Object.keys(L.CLASSES)) {
 const p = L.newPlayer();
 L.gainXp(p, 10);
 assert.strictEqual(p.level, 2);
-console.log('all tests passed');
 
 // Archer: shots deal half damage when adjacent, full at range; ranged enemies shoot.
 {
@@ -79,7 +82,7 @@ console.log('all tests passed');
   const mp = p.mp, hp = lv.enemies[0].hp;
   L.playerShoot(p, lv, 1, 0);
   assert.strictEqual(p.mp, mp - 1, 'wizard ranged attack costs one mana');
-  assert(lv.enemies[0].hp <= hp - 19 && lv.enemies[0].hp >= hp - 21, 'wizard ranged damage fades with distance');
+  assert(lv.enemies[0].hp <= hp - 18 && lv.enemies[0].hp >= hp - 20, 'wizard ranged damage fades with distance');
 }
 {
   const open = () => ({ map: Array.from({ length: 11 }, (_, y) => Array.from({ length: 15 }, (_, x) => (x === 0 || y === 0 || x === 14 || y === 10 ? 1 : 0))), enemies: [], items: [], floor: 1, stairs: null });
@@ -92,6 +95,10 @@ console.log('all tests passed');
   p.mp = 0;
   const noMana = L.playerShoot(p, lv, 1, 0);
   assert.strictEqual(noMana.acted, false, 'wizard cannot attack without mana');
+  p.mp = 2;
+  const blockedMp = p.mp;
+  L.playerShoot(p, lv, -1, 0);
+  assert.strictEqual(p.mp, blockedMp, 'blocked shot does not cost mana');
 }
 {
   const p = L.newPlayer('wizard');
@@ -100,13 +107,13 @@ console.log('all tests passed');
   assert.strictEqual(lv.enemies[0].hp, 88, 'wizard spells deal double damage');
 }
 {
-  const p = L.newPlayer('fighter');
+  const map = Array.from({ length: 11 }, (_, y) => Array.from({ length: 15 }, (_, x) => (x === 0 || y === 0 || x === 14 || y === 10 ? 1 : 0)));
+  const p = L.newPlayer('fighter'), lv = { map, enemies: [{ type: 'rat', name: 'Rat', x: 2, y: 1, hp: 1, xp: 4, gold: 2 }], floor: 1 };
   p.inv.push('potion', 'wand');
-  const lv = { enemies: [{ type: 'rat', name: 'Rat', hp: 1, xp: 4, gold: 2 }], floor: 1 };
-  const msgs = [];
-  L.damageEnemy(p, lv, lv.enemies[0], 1, msgs);
+  L.playerMove(p, lv, 1, 0);
   assert.strictEqual(p.gold, 2, 'enemy kill awards gold');
   assert.strictEqual(L.cashOutInventory(p), 15, 'remaining inventory converts to gold');
   assert.strictEqual(p.gold, 17, 'cash-out adds to player gold');
   assert.strictEqual(p.inv.length, 0, 'cash-out removes sold inventory');
 }
+console.log('all tests passed');

@@ -170,9 +170,9 @@ function playerMove(p, lv, dx, dy) {
 function playerShoot(p, lv, dx, dy) {
   const msgs = [];
   if ((p.cls !== 'archer' && p.cls !== 'wizard') || (dx === 0 && dy === 0)) return { acted: false, msgs };
+  if (!inBounds(lv, p.x + dx, p.y + dy)) return { acted: false, msgs };
   if (p.cls === 'wizard' && p.mp < WIZARD_ATTACK_COST) return { acted: false, msgs: ['Not enough mana to attack.'] };
   if (p.cls === 'wizard') p.mp -= WIZARD_ATTACK_COST;
-  if (!inBounds(lv, p.x + dx, p.y + dy)) return { acted: false, msgs };
   let x = p.x, y = p.y;
   for (let d = 1; d <= PLAYER_RANGE; d++) {
     x += dx; y += dy;
