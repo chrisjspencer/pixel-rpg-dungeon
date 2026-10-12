@@ -14,6 +14,7 @@ function updateHud() {
   $('floor').textContent = 'Floor ' + floorNum + '/' + MAX_FLOOR;
   $('lvl').textContent = 'Lv ' + p.level;
   $('stats').textContent = 'ATK ' + playerAtk(p) + ' DEF ' + playerDef(p);
+  $('gold').textContent = 'Gold ' + p.gold;
   $('hpFill').style.width = (100 * p.hp / p.maxHp) + '%';
   $('mpFill').style.width = (100 * p.mp / p.maxMp) + '%';
   $('xpFill').style.width = (100 * p.xp / xpNeeded(p)) + '%';
@@ -71,8 +72,11 @@ function endTurn(result) {
   const msgs = result.msgs.slice();
   if (result.won) {
     DungeonAudio.victory();
+    const itemGold = cashOutInventory(player);
+    if (itemGold) msgs.push('Remaining items sold for ' + itemGold + ' gold.');
+    setAiming(false);
     log(msgs); updateHud(); scene.render(); gameOver = true;
-    showMessage('Victory!', 'The Dungeon Lord has fallen. You conquered the dungeon!');
+    showMessage('Victory!', 'The Dungeon Lord has fallen. You conquered the dungeon! Total gold: ' + player.gold + '.');
     return;
   }
   if (result.newFloor) {
@@ -93,29 +97,44 @@ function endTurn(result) {
   scene.render();
   if (player.hp <= 0) {
     DungeonAudio.defeat();
+    const itemGold = cashOutInventory(player);
+    if (itemGold) log(['Remaining items sold for ' + itemGold + ' gold.']);
+    setAiming(false);
+    updateHud();
     gameOver = true;
-    showMessage('You died', 'Reached floor ' + floorNum + ', level ' + player.level + '.');
+    showMessage('You died', 'Reached floor ' + floorNum + ', level ' + player.level + '. Total gold: ' + player.gold + '.');
   }
 }
 
 function setAiming(on) {
   aiming = on;
-  document.querySelectorAll('#dpad button').forEach((b) => b.classList.toggle('aim', on && b.dataset.dir !== 'wait'));
+  document.querySelectorAll('#dpad button').forEach((b) => {
+    const active = on && b.dataset.dir !== 'wait';
+    b.classList.toggle('aim', active);
+    b.classList.toggle('wizard-aim', active && player && player.cls === 'wizard');
+  });
 }
 
 function act(dx, dy) {
   if (gameOver || !$('inventory').classList.contains('hidden')) return;
   if (aiming) {
     setAiming(false);
-    if (dx !== 0 || dy !== 0) {
-      const s = playerShoot(player, level, dx, dy);
-      if (!s.acted) return;
-      if (s.hitX !== undefined) { scene.flash(s.hitX, s.hitY); DungeonAudio.attack(); }
-      endTurn(s);
+    if (dx === 0 && dy === 0) {
+      endTurn(playerMove(player, level, 0, 0));
+      return;
     }
+    const s = playerShoot(player, level, dx, dy);
+    if (!s.acted) { log(s.msgs); return; }
+    if (s.hitX !== undefined) { scene.flash(s.hitX, s.hitY); DungeonAudio.attack(); }
+    endTurn(s);
     return;
   }
-  if (dx === 0 && dy === 0 && player.cls === 'archer') { setAiming(true); log(['Aim: press a direction to shoot.']); return; }
+  if (dx === 0 && dy === 0 && (player.cls === 'archer' || player.cls === 'wizard')) {
+    setAiming(true);
+    log(['Aim: press a direction to shoot.']);
+    endTurn(playerMove(player, level, 0, 0));
+    return;
+  }
   const r = playerMove(player, level, dx, dy);
   if (!r.acted) return;
   if (r.hitX !== undefined) { scene.flash(r.hitX, r.hitY); DungeonAudio.attack(); }

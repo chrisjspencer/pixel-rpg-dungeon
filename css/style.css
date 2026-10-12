@@ -30,3 +30,4 @@ small { font-size: 11px; color: #cfc8e6; }
 #invList button { display: block; width: 100%; padding: 10px; margin: 4px 0; text-align: left; }
 #invList .empty { color: #8a80aa; }
 #dpad button.aim { background: #2e8b3a; color: #fff; }
+#dpad button.wizard-aim { background: #b52f3a; border-color: #e35c67; color: #fff; }
