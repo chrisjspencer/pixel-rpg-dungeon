@@ -35,6 +35,14 @@ for (const c of Object.keys(L.CLASSES)) {
   lv.map[2][2] = 0; lv.enemies = []; lv.items = [];
   assert(L.playerMove(q, lv, 1, 1).acted && q.x === 2 && q.y === 2, 'diagonal move');
 }
+{
+  const lv = L.generateLevel(1), q = L.newPlayer('fighter');
+  q.x = 1; q.y = 1;
+  lv.map[2][2] = 0;
+  lv.enemies = [{ type: 'rat', name: 'Rat', x: 2, y: 2, hp: 5, maxHp: 5, atk: 2, xp: 4 }];
+  const msgs = L.enemyTurn(q, lv);
+  assert(msgs.some((msg) => msg.startsWith('Rat hits you for ')) && q.hp < q.maxHp, 'diagonal enemy attack');
+}
 const p = L.newPlayer();
 L.gainXp(p, 10);
 assert.strictEqual(p.level, 2);
