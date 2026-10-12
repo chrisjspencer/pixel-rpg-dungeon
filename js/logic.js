@@ -1,12 +1,12 @@
 // Pure game logic (no Phaser dependencies) so it is easy to reason about and test.
-const MAP_W = 15, MAP_H = 11, MAX_FLOOR = 5, INV_MAX = 8, SPELL_COST = 4;
+const MAP_W = 15, MAP_H = 11, MAX_FLOOR = 5, INV_MAX = 8, SPELL_COST = 4, WIZARD_ATTACK_COST = 1;
 
 const ENEMY_TYPES = {
-  rat:      { name: 'Rat',      hp: 5,  atk: 2, xp: 4,  sprite: 'rat' },
-  bat:      { name: 'Bat',      hp: 4,  atk: 3, xp: 5,  sprite: 'bat', erratic: true },
-  skeleton: { name: 'Skeleton', hp: 10, atk: 4, xp: 9,  sprite: 'skeleton' },
-  goblin:   { name: 'Goblin Archer', hp: 7, atk: 4, xp: 8, sprite: 'goblin', ranged: true, range: 4 },
-  boss:     { name: 'Dungeon Lord', hp: 45, atk: 8, xp: 100, sprite: 'boss', ranged: true, range: 4, rangedAtk: 5, melee: true }
+  rat:      { name: 'Rat',      hp: 5,  atk: 2,  xp: 4,  gold: 1,  sprite: 'rat' },
+  bat:      { name: 'Bat',      hp: 4,  atk: 3,  xp: 5,  gold: 1,  sprite: 'bat', erratic: true },
+  skeleton: { name: 'Skeleton', hp: 10, atk: 4,  xp: 9,  gold: 3,  sprite: 'skeleton' },
+  goblin:   { name: 'Goblin Archer', hp: 7, atk: 4, xp: 8, gold: 2, sprite: 'goblin', ranged: true, range: 4 },
+  boss:     { name: 'Dungeon Lord', hp: 45, atk: 8, xp: 100, gold: 50, sprite: 'boss', ranged: true, range: 4, rangedAtk: 5, melee: true }
 };
 
 const CLASSES = {
@@ -14,23 +14,23 @@ const CLASSES = {
   archer:  { name: 'Archer',  desc: 'Nimble, great with bows',   sprite: 'archer',  hp: 20, mp: 6, atk: 3, weapon: 'bow' },
   wizard:  { name: 'Wizard',  desc: 'Frail, great with wands',   sprite: 'wizard',  hp: 16, mp: 12, atk: 2, weapon: 'wand' }
 };
-const ARCHER_RANGE = 5;
-const WEAPON_MATCH = 4, WEAPON_OFF = 1;
+const PLAYER_RANGE = 5;
+const WEAPON_MATCH = 1, WEAPON_OFF = 0;
 
 const ITEM_TYPES = {
-  potion: { name: 'Health Potion', sprite: 'potion', desc: 'Restore 15 HP' },
-  mana:   { name: 'Mana Potion',   sprite: 'mana',   desc: 'Restore 10 MP' },
-  sword:  { name: 'Sword',         sprite: 'sword',  desc: '+4 ATK for Fighter, +1 others (equip)' },
-  bow:    { name: 'Bow',           sprite: 'bow',    desc: '+4 ATK for Archer, +1 others (equip)' },
-  wand:   { name: 'Wand',          sprite: 'wand',   desc: '+4 ATK & spell for Wizard, +1 others (equip)' },
-  armor:  { name: 'Armor',         sprite: 'armor',  desc: '+1 DEF (equip)' }
+  potion: { name: 'Health Potion', sprite: 'potion', desc: 'Restore 15 HP', gold: 5 },
+  mana:   { name: 'Mana Potion',   sprite: 'mana',   desc: 'Restore 10 MP', gold: 5 },
+  sword:  { name: 'Sword',         sprite: 'sword',  desc: '+1 ATK for Fighter (equip)', gold: 10 },
+  bow:    { name: 'Bow',           sprite: 'bow',    desc: '+1 ATK for Archer (equip)', gold: 10 },
+  wand:   { name: 'Wand',          sprite: 'wand',   desc: '+1 ATK & spell for Wizard (equip)', gold: 10 },
+  armor:  { name: 'Armor',         sprite: 'armor',  desc: '+1 DEF (equip)', gold: 10 }
 };
 
 const rnd = (n) => Math.floor(Math.random() * n);
 
 function newPlayer(cls) {
   const c = CLASSES[cls] || CLASSES.fighter;
-  return { cls: CLASSES[cls] ? cls : 'fighter', sprite: c.sprite, x: 1, y: 1, hp: c.hp, maxHp: c.hp, mp: c.mp, maxMp: c.mp, level: 1, xp: 0, baseAtk: c.atk, weapon: 0, spellBonus: 0, armor: 0, inv: [], turn: 0 };
+  return { cls: CLASSES[cls] ? cls : 'fighter', sprite: c.sprite, x: 1, y: 1, hp: c.hp, maxHp: c.hp, mp: c.mp, maxMp: c.mp, level: 1, xp: 0, baseAtk: c.atk, weapon: 0, spellBonus: 0, armor: 0, inv: [], gold: 0, turn: 0 };
 }
 const playerAtk = (p) => p.baseAtk + p.weapon;
 const playerDef = (p) => p.armor;
@@ -106,7 +106,7 @@ function generateLevel(floor) {
 function makeEnemy(type, x, y, floor) {
   const t = ENEMY_TYPES[type];
   const scale = type === 'boss' ? 0 : floor - 1;
-  return { type, name: t.name, x, y, hp: t.hp + scale * 2, maxHp: t.hp + scale * 2, atk: t.atk + Math.floor(scale / 2), xp: t.xp + scale, sprite: t.sprite };
+  return { type, name: t.name, x, y, hp: t.hp + scale * 2, maxHp: t.hp + scale * 2, atk: t.atk + Math.floor(scale / 2), xp: t.xp + scale, gold: t.gold + scale, sprite: t.sprite };
 }
 
 const inBounds = (lv, x, y) => lv.map[y] !== undefined && lv.map[y][x] === 0;
@@ -130,7 +130,9 @@ function damageEnemy(p, lv, e, dmg, msgs) {
   e.hp -= dmg;
   if (e.hp > 0) return false;
   lv.enemies.splice(lv.enemies.indexOf(e), 1);
-  msgs.push(e.name + ' defeated! +' + e.xp + ' XP');
+  const gold = e.gold || 0;
+  p.gold += gold;
+  msgs.push(e.name + ' defeated! +' + e.xp + ' XP, +' + gold + ' gold');
   msgs.push(...gainXp(p, e.xp));
   return true;
 }
@@ -143,6 +145,8 @@ function playerMove(p, lv, dx, dy) {
   if (!inBounds(lv, nx, ny)) return { acted: false, msgs };
   const e = enemyAt(lv, nx, ny);
   if (e) {
+    if (p.cls === 'wizard' && p.mp < WIZARD_ATTACK_COST) return { acted: false, msgs: ['Not enough mana to attack.'] };
+    if (p.cls === 'wizard') p.mp -= WIZARD_ATTACK_COST;
     let dmg = Math.max(1, playerAtk(p) + rnd(3) - 1);
     if (p.cls === 'archer') dmg = Math.max(1, Math.floor(dmg / 2));
     msgs.push('You hit ' + e.name + ' for ' + dmg + '.');
@@ -162,20 +166,23 @@ function playerMove(p, lv, dx, dy) {
   return { acted: true, msgs };
 }
 
-// Archer ranged shot along a straight line (8 directions). Full damage at range, half when adjacent.
+// Archer and wizard ranged attacks follow a straight line in any of 8 directions.
 function playerShoot(p, lv, dx, dy) {
   const msgs = [];
-  if (p.cls !== 'archer' || (dx === 0 && dy === 0)) return { acted: false, msgs };
+  if ((p.cls !== 'archer' && p.cls !== 'wizard') || (dx === 0 && dy === 0)) return { acted: false, msgs };
+  if (p.cls === 'wizard' && p.mp < WIZARD_ATTACK_COST) return { acted: false, msgs: ['Not enough mana to attack.'] };
+  if (p.cls === 'wizard') p.mp -= WIZARD_ATTACK_COST;
   if (!inBounds(lv, p.x + dx, p.y + dy)) return { acted: false, msgs };
   let x = p.x, y = p.y;
-  for (let d = 1; d <= ARCHER_RANGE; d++) {
+  for (let d = 1; d <= PLAYER_RANGE; d++) {
     x += dx; y += dy;
     if (!inBounds(lv, x, y)) break;
     const e = enemyAt(lv, x, y);
     if (!e) continue;
     let dmg = Math.max(1, playerAtk(p) + rnd(3) - 1);
-    if (d === 1) dmg = Math.max(1, Math.floor(dmg / 2));
-    msgs.push('Your arrow hits ' + e.name + ' for ' + dmg + '.');
+    if (p.cls === 'archer' && d === 1) dmg = Math.max(1, Math.floor(dmg / 2));
+    if (p.cls === 'wizard') dmg = Math.max(1, dmg - d + 1);
+    msgs.push((p.cls === 'wizard' ? 'Your bolt hits ' : 'Your arrow hits ') + e.name + ' for ' + dmg + '.');
     damageEnemy(p, lv, e, dmg, msgs);
     return { acted: true, msgs, hitX: x, hitY: y, won: lv.floor === MAX_FLOOR && !lv.enemies.some((q) => q.type === 'boss') };
   }
@@ -188,11 +195,19 @@ function castSpell(p, lv) {
   const msgs = [];
   if (p.mp < SPELL_COST) return { acted: false, msgs: ['Not enough mana.'] };
   p.mp -= SPELL_COST;
-  const dmg = 4 + p.level * 2 + (p.spellBonus || 0);
+  const baseDamage = 4 + p.level * 2 + (p.spellBonus || 0);
+  const dmg = p.cls === 'wizard' ? baseDamage * 2 : baseDamage;
   const targets = lv.enemies.filter((e) => Math.abs(e.x - p.x) + Math.abs(e.y - p.y) <= 3);
   if (!targets.length) msgs.push('The flames fizzle out.');
   targets.forEach((e) => { msgs.push('Fire burns ' + e.name + ' for ' + dmg + '.'); damageEnemy(p, lv, e, dmg, msgs); });
   return { acted: true, msgs, targets: targets.map((e) => [e.x, e.y]), won: lv.floor === MAX_FLOOR && !lv.enemies.some((x) => x.type === 'boss') };
+}
+
+function cashOutInventory(p) {
+  const gold = p.inv.reduce((total, type) => total + (ITEM_TYPES[type] ? ITEM_TYPES[type].gold : 0), 0);
+  p.inv = [];
+  p.gold += gold;
+  return gold;
 }
 
 function useItem(p, index) {
@@ -205,7 +220,7 @@ function useItem(p, index) {
     const b = CLASSES[p.cls] && CLASSES[p.cls].weapon === type ? WEAPON_MATCH : WEAPON_OFF;
     p.weapon += b;
     if (type === 'wand') p.spellBonus += b;
-    msg = 'Equipped ' + ITEM_TYPES[type].name.toLowerCase() + '. ATK +' + b + (b === WEAPON_MATCH ? ' (mastery!)' : '') + (type === 'wand' ? ', spell +' + b : '') + '.';
+    msg = 'Equipped ' + ITEM_TYPES[type].name.toLowerCase() + (b ? '. ATK +' + b + (type === 'wand' ? ', spell +' + b : '') : '. No class bonus.');
   }
   else if (type === 'armor') { p.armor += 1; msg = 'Equipped armor. DEF +1.'; }
   p.inv.splice(index, 1);
@@ -270,5 +285,5 @@ function regen(p) {
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { CLASSES, generateLevel, newPlayer, playerMove, playerShoot, castSpell, useItem, enemyTurn, regen, gainXp, MAP_W, MAP_H, MAX_FLOOR };
+  module.exports = { CLASSES, ITEM_TYPES, generateLevel, newPlayer, playerMove, playerShoot, castSpell, useItem, cashOutInventory, enemyTurn, regen, gainXp, MAP_W, MAP_H, MAX_FLOOR };
 }
