@@ -13,6 +13,7 @@ const SPRITES = {
   rat: ['........','..nn..nn','.nnnnnnn','nnknnnkn','.nnnnnnn','..nnnnn.','nn.n.n.n','........'],
   bat: ['p......p','pp.pp.pp','pppppppp','ppkppkpp','.pppppp.','..pwwp..','...pp...','........'],
   skeleton: ['..wwww..','.wwwwww.','.wkwwkw.','..wwww..','.wwwwww.','.w.ww.w.','..wwww..','.ww..ww.'],
+  goblin: ['..GGGG..','.GGGGGG.','.GkGGkG.','..GGGG..','.nGGGGn.','nwGGGG..','.nGGGG..','.GG..GG.'],
   boss: ['r.rrrr.r','rrrrrrrr','rykrrkyr','rrrrrrrr','.rwrrwr.','.rrrrrr.','rrrrrrrr','rr.rr.rr'],
   potion: ['...nn...','...ww...','..wrrw..','.wrrrrw.','.wrrrrw.','.wrrrrw.','..wwww..','........'],
   mana: ['...nn...','...ww...','..wbbw..','.wbbbbw.','.wbbbbw.','.wbbbbw.','..wwww..','........'],

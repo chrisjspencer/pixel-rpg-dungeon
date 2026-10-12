@@ -5,7 +5,8 @@ const ENEMY_TYPES = {
   rat:      { name: 'Rat',      hp: 5,  atk: 2, xp: 4,  sprite: 'rat' },
   bat:      { name: 'Bat',      hp: 4,  atk: 3, xp: 5,  sprite: 'bat', erratic: true },
   skeleton: { name: 'Skeleton', hp: 10, atk: 4, xp: 9,  sprite: 'skeleton' },
-  boss:     { name: 'Dungeon Lord', hp: 45, atk: 8, xp: 100, sprite: 'boss' }
+  goblin:   { name: 'Goblin Archer', hp: 7, atk: 4, xp: 8, sprite: 'goblin', ranged: true, range: 4 },
+  boss:     { name: 'Dungeon Lord', hp: 45, atk: 8, xp: 100, sprite: 'boss', ranged: true, range: 4, rangedAtk: 5, melee: true }
 };
 
 const CLASSES = {
@@ -13,6 +14,7 @@ const CLASSES = {
   archer:  { name: 'Archer',  desc: 'Nimble, great with bows',   sprite: 'archer',  hp: 20, mp: 6, atk: 3, weapon: 'bow' },
   wizard:  { name: 'Wizard',  desc: 'Frail, great with wands',   sprite: 'wizard',  hp: 16, mp: 12, atk: 2, weapon: 'wand' }
 };
+const ARCHER_RANGE = 5;
 const WEAPON_MATCH = 4, WEAPON_OFF = 1;
 
 const ITEM_TYPES = {
@@ -84,7 +86,7 @@ function generateLevel(floor) {
       enemies.push(makeEnemy('boss', far[0], far[1], floor));
     }
     const count = 2 + floor + rnd(2);
-    const pool = floor === 1 ? ['rat', 'rat', 'bat'] : floor < 4 ? ['rat', 'bat', 'skeleton'] : ['bat', 'skeleton', 'skeleton'];
+    const pool = floor === 1 ? ['rat', 'rat', 'bat'] : floor < 4 ? ['rat', 'bat', 'skeleton', 'goblin'] : ['bat', 'skeleton', 'goblin', 'goblin'];
     for (let i = 0; i < count; i++) {
       const pos = pick(5);
       if (pos) enemies.push(makeEnemy(pool[rnd(pool.length)], pos.x, pos.y, floor));
@@ -141,7 +143,8 @@ function playerMove(p, lv, dx, dy) {
   if (!inBounds(lv, nx, ny)) return { acted: false, msgs };
   const e = enemyAt(lv, nx, ny);
   if (e) {
-    const dmg = Math.max(1, playerAtk(p) + rnd(3) - 1);
+    let dmg = Math.max(1, playerAtk(p) + rnd(3) - 1);
+    if (p.cls === 'archer') dmg = Math.max(1, Math.floor(dmg / 2));
     msgs.push('You hit ' + e.name + ' for ' + dmg + '.');
     damageEnemy(p, lv, e, dmg, msgs);
     return { acted: true, msgs, hitX: nx, hitY: ny, won: lv.floor === MAX_FLOOR && !lv.enemies.some((x) => x.type === 'boss') };
@@ -157,6 +160,27 @@ function playerMove(p, lv, dx, dy) {
   }
   if (lv.stairs && lv.stairs.x === nx && lv.stairs.y === ny) return { acted: true, msgs, newFloor: true };
   return { acted: true, msgs };
+}
+
+// Archer ranged shot along a straight line (8 directions). Full damage at range, half when adjacent.
+function playerShoot(p, lv, dx, dy) {
+  const msgs = [];
+  if (p.cls !== 'archer' || (dx === 0 && dy === 0)) return { acted: false, msgs };
+  if (!inBounds(lv, p.x + dx, p.y + dy)) return { acted: false, msgs };
+  let x = p.x, y = p.y;
+  for (let d = 1; d <= ARCHER_RANGE; d++) {
+    x += dx; y += dy;
+    if (!inBounds(lv, x, y)) break;
+    const e = enemyAt(lv, x, y);
+    if (!e) continue;
+    let dmg = Math.max(1, playerAtk(p) + rnd(3) - 1);
+    if (d === 1) dmg = Math.max(1, Math.floor(dmg / 2));
+    msgs.push('Your arrow hits ' + e.name + ' for ' + dmg + '.');
+    damageEnemy(p, lv, e, dmg, msgs);
+    return { acted: true, msgs, hitX: x, hitY: y, won: lv.floor === MAX_FLOOR && !lv.enemies.some((q) => q.type === 'boss') };
+  }
+  msgs.push('Your arrow misses.');
+  return { acted: true, msgs, hitX: x, hitY: y };
 }
 
 // Fire spell: hits every enemy within 3 tiles.
@@ -188,16 +212,38 @@ function useItem(p, index) {
   return { used: true, msg };
 }
 
+// True if target is in a straight line within range with nothing blocking.
+function clearShot(lv, from, to, range) {
+  const ddx = to.x - from.x, ddy = to.y - from.y;
+  const d = Math.max(Math.abs(ddx), Math.abs(ddy));
+  if (d < 2 || d > range || (ddx !== 0 && ddy !== 0 && Math.abs(ddx) !== Math.abs(ddy))) return false;
+  const sx = Math.sign(ddx), sy = Math.sign(ddy);
+  for (let i = 1; i < d; i++) {
+    const x = from.x + sx * i, y = from.y + sy * i;
+    if (!inBounds(lv, x, y) || enemyAt(lv, x, y)) return false;
+  }
+  return true;
+}
+
 // Enemy turn: chase when close, otherwise wander. Returns messages.
 function enemyTurn(p, lv) {
   const msgs = [];
   for (const e of lv.enemies) {
     const dxToPlayer = Math.abs(e.x - p.x), dyToPlayer = Math.abs(e.y - p.y);
     const dist = dxToPlayer + dyToPlayer;
+    const et = ENEMY_TYPES[e.type];
     if (Math.max(dxToPlayer, dyToPlayer) === 1) {
-      const dmg = Math.max(1, e.atk - playerDef(p) + rnd(2));
+      let dmg = Math.max(1, e.atk - playerDef(p) + rnd(2));
+      if (et.ranged && !et.melee) dmg = Math.max(1, Math.floor(dmg / 2));
       p.hp -= dmg;
       msgs.push(e.name + ' hits you for ' + dmg + '.');
+      if (p.hp <= 0) { p.hp = 0; break; }
+      continue;
+    }
+    if (et.ranged && clearShot(lv, e, p, et.range)) {
+      const dmg = Math.max(1, (et.rangedAtk || e.atk) - playerDef(p) + rnd(2));
+      p.hp -= dmg;
+      msgs.push(e.name + ' shoots you for ' + dmg + '.');
       if (p.hp <= 0) { p.hp = 0; break; }
       continue;
     }
@@ -224,5 +270,5 @@ function regen(p) {
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { CLASSES, generateLevel, newPlayer, playerMove, castSpell, useItem, enemyTurn, regen, gainXp, MAP_W, MAP_H, MAX_FLOOR };
+  module.exports = { CLASSES, generateLevel, newPlayer, playerMove, playerShoot, castSpell, useItem, enemyTurn, regen, gainXp, MAP_W, MAP_H, MAX_FLOOR };
 }
