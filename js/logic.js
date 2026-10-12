@@ -192,8 +192,9 @@ function useItem(p, index) {
 function enemyTurn(p, lv) {
   const msgs = [];
   for (const e of lv.enemies) {
-    const dist = Math.abs(e.x - p.x) + Math.abs(e.y - p.y);
-    if (dist === 1) {
+    const dxToPlayer = Math.abs(e.x - p.x), dyToPlayer = Math.abs(e.y - p.y);
+    const dist = dxToPlayer + dyToPlayer;
+    if (Math.max(dxToPlayer, dyToPlayer) === 1) {
       const dmg = Math.max(1, e.atk - playerDef(p) + rnd(2));
       p.hp -= dmg;
       msgs.push(e.name + ' hits you for ' + dmg + '.');

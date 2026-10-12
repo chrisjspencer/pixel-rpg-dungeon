@@ -8,6 +8,7 @@ A small turn-based pixel dungeon crawler built with **Phaser 3** and vanilla Jav
 Descend through 5 floors and defeat the **Dungeon Lord** on floor 5.
 
 - **Move / attack:** D-pad buttons, swipe on the map, or arrow keys / WASD. Walk into an enemy to attack.
+- **Audio:** synthesized dungeon music and sound effects begin after you choose a hero.
 - **Wait:** the centre button (or Space). Every action is a turn; enemies move after you.
 - **Spell (🔥):** costs 4 MP, burns all enemies within 3 tiles (key `F`).
 - **Bag (🎒):** tap an item to use or equip it (key `I`). Potions heal HP/MP, swords add ATK, armor adds DEF. Walk over items to pick them up (max 8).
