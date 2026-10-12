@@ -1,7 +1,7 @@
 const TILE = 16;
 const $ = (id) => document.getElementById(id);
 
-let player, level, floorNum, gameOver, scene, aiming = false;
+let player, level, floorNum, gameOver, scene, aiming = false, resolvingAction = false;
 let logLines = [];
 
 function log(msgs) {
@@ -51,6 +51,7 @@ function chooseClass() {
 
 function startGame(cls) {
   setAiming(false);
+  resolvingAction = false;
   player = newPlayer(cls);
   floorNum = 1;
   gameOver = false;
@@ -116,7 +117,7 @@ function setAiming(on) {
 }
 
 function act(dx, dy) {
-  if (gameOver || !$('inventory').classList.contains('hidden')) return;
+  if (gameOver || resolvingAction || !$('inventory').classList.contains('hidden')) return;
   if (aiming) {
     setAiming(false);
     if (dx === 0 && dy === 0) {
@@ -125,8 +126,13 @@ function act(dx, dy) {
     }
     const s = playerShoot(player, level, dx, dy);
     if (!s.acted) { log(s.msgs); return; }
-    if (s.hitX !== undefined) { scene.flash(s.hitX, s.hitY); DungeonAudio.attack(); }
-    endTurn(s);
+    resolvingAction = true;
+    scene.animateProjectile(s.shotPath, player.cls).then(() => {
+      resolvingAction = false;
+      if (s.hitX !== undefined) scene.flash(s.hitX, s.hitY);
+      DungeonAudio.attack();
+      endTurn(s);
+    });
     return;
   }
   if (dx === 0 && dy === 0 && (player.cls === 'archer' || player.cls === 'wizard')) {
@@ -142,7 +148,7 @@ function act(dx, dy) {
 }
 
 function cast() {
-  if (gameOver) return;
+  if (gameOver || resolvingAction) return;
   const r = castSpell(player, level);
   if (!r.acted) { log(r.msgs); return; }
   DungeonAudio.spell();
@@ -175,6 +181,7 @@ class DungeonScene extends Phaser.Scene {
     this.layer = this.add.group();
     const dirs = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0], w: [0, -1], s: [0, 1], a: [-1, 0], d: [1, 0], ' ': [0, 0], q: [-1, -1], e: [1, -1], z: [-1, 1], c: [1, 1] };
     window.addEventListener('keydown', (e) => {
+      if (resolvingAction) return;
       if (dirs[e.key]) { e.preventDefault(); act(...dirs[e.key]); }
       else if (e.key === 'f') cast();
       else if (e.key === 'i') { renderInventory(); $('inventory').classList.toggle('hidden'); }
@@ -198,6 +205,27 @@ class DungeonScene extends Phaser.Scene {
   flash(x, y) {
     const s = this.add.image(x * TILE + 8, y * TILE + 8, 'spark').setDepth(10);
     this.tweens.add({ targets: s, alpha: 0, scale: 1.6, duration: 250, onComplete: () => s.destroy() });
+  }
+
+  animateProjectile(path, cls) {
+    if (!path || !path.length) return Promise.resolve();
+    const startX = player.x * TILE + 8, startY = player.y * TILE + 8;
+    const [endTileX, endTileY] = path[path.length - 1];
+    const endX = endTileX * TILE + 8, endY = endTileY * TILE + 8;
+    const duration = Math.max(90, path.length * 55);
+    const trail = this.add.graphics().lineStyle(2, cls === 'archer' ? 0xe0b830 : 0x9fc8ff, 0.7)
+      .lineBetween(startX, startY, endX, endY).setDepth(7);
+    const projectile = this.add.image(startX, startY, cls === 'archer' ? 'arrow' : 'bolt')
+      .setDepth(8).setScale(0.65).setRotation(Math.atan2(endY - startY, endX - startX));
+    this.tweens.add({ targets: trail, alpha: 0, duration });
+    return new Promise((resolve) => {
+      this.tweens.add({
+        targets: projectile,
+        x: endX, y: endY, alpha: 0,
+        duration,
+        onComplete: () => { projectile.destroy(); trail.destroy(); resolve(); }
+      });
+    });
   }
 
   render() {
@@ -231,6 +259,6 @@ document.querySelectorAll('#dpad button').forEach((b) => {
   b.addEventListener('click', () => act(...d));
 });
 $('spellBtn').onclick = cast;
-$('bagBtn').onclick = () => { if (!gameOver) { renderInventory(); $('inventory').classList.remove('hidden'); } };
+$('bagBtn').onclick = () => { if (!gameOver && !resolvingAction) { renderInventory(); $('inventory').classList.remove('hidden'); } };
 $('closeBag').onclick = () => $('inventory').classList.add('hidden');
 $('msgBtn').onclick = chooseClass;

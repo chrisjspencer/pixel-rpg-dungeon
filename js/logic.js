@@ -174,9 +174,12 @@ function playerShoot(p, lv, dx, dy) {
   if (p.cls === 'wizard' && p.mp < WIZARD_ATTACK_COST) return { acted: false, msgs: ['Not enough mana to attack.'] };
   if (p.cls === 'wizard') p.mp -= WIZARD_ATTACK_COST;
   let x = p.x, y = p.y;
+  const shotPath = [];
   for (let d = 1; d <= PLAYER_RANGE; d++) {
-    x += dx; y += dy;
-    if (!inBounds(lv, x, y)) break;
+    const nx = x + dx, ny = y + dy;
+    if (!inBounds(lv, nx, ny)) break;
+    x = nx; y = ny;
+    shotPath.push([x, y]);
     const e = enemyAt(lv, x, y);
     if (!e) continue;
     let dmg = Math.max(1, playerAtk(p) + rnd(3) - 1);
@@ -184,10 +187,10 @@ function playerShoot(p, lv, dx, dy) {
     if (p.cls === 'wizard') dmg = Math.max(1, dmg - d + 1);
     msgs.push((p.cls === 'wizard' ? 'Your bolt hits ' : 'Your arrow hits ') + e.name + ' for ' + dmg + '.');
     damageEnemy(p, lv, e, dmg, msgs);
-    return { acted: true, msgs, hitX: x, hitY: y, won: lv.floor === MAX_FLOOR && !lv.enemies.some((q) => q.type === 'boss') };
+    return { acted: true, msgs, hitX: x, hitY: y, shotPath, won: lv.floor === MAX_FLOOR && !lv.enemies.some((q) => q.type === 'boss') };
   }
   msgs.push('Your arrow misses.');
-  return { acted: true, msgs, hitX: x, hitY: y };
+  return { acted: true, msgs, hitX: x, hitY: y, shotPath };
 }
 
 // Fire spell: hits every enemy within 3 tiles.
