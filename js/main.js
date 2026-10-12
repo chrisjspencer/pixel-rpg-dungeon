@@ -29,8 +29,22 @@ function showMessage(title, text) {
   $('message').classList.remove('hidden');
 }
 
-function startGame() {
-  player = newPlayer();
+function chooseClass() {
+  gameOver = true;
+  $('message').classList.add('hidden');
+  const list = $('classes');
+  list.innerHTML = '';
+  Object.keys(CLASSES).forEach((k) => {
+    const b = document.createElement('button');
+    b.textContent = CLASSES[k].name + ' - ' + CLASSES[k].desc;
+    b.onclick = () => { $('classSelect').classList.add('hidden'); startGame(k); };
+    list.appendChild(b);
+  });
+  $('classSelect').classList.remove('hidden');
+}
+
+function startGame(cls) {
+  player = newPlayer(cls);
   floorNum = 1;
   gameOver = false;
   logLines = [];
@@ -111,7 +125,7 @@ class DungeonScene extends Phaser.Scene {
     buildTextures(this);
     scene = this;
     this.layer = this.add.group();
-    const dirs = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0], w: [0, -1], s: [0, 1], a: [-1, 0], d: [1, 0], ' ': [0, 0] };
+    const dirs = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0], w: [0, -1], s: [0, 1], a: [-1, 0], d: [1, 0], ' ': [0, 0], q: [-1, -1], e: [1, -1], z: [-1, 1], c: [1, 1] };
     window.addEventListener('keydown', (e) => {
       if (dirs[e.key]) { e.preventDefault(); act(...dirs[e.key]); }
       else if (e.key === 'f') cast();
@@ -125,9 +139,12 @@ class DungeonScene extends Phaser.Scene {
       const dx = p.x - start.x, dy = p.y - start.y;
       start = null;
       if (Math.max(Math.abs(dx), Math.abs(dy)) < 12) return;
-      if (Math.abs(dx) > Math.abs(dy)) act(Math.sign(dx), 0); else act(0, Math.sign(dy));
+      const ax = Math.abs(dx), ay = Math.abs(dy);
+      if (ax > 2 * ay) act(Math.sign(dx), 0);
+      else if (ay > 2 * ax) act(0, Math.sign(dy));
+      else act(Math.sign(dx), Math.sign(dy));
     });
-    startGame();
+    chooseClass();
   }
 
   flash(x, y) {
@@ -146,7 +163,7 @@ class DungeonScene extends Phaser.Scene {
       const w = Math.max(1, Math.round(14 * e.hp / e.maxHp));
       this.layer.add(this.add.rectangle(e.x * TILE + 1, e.y * TILE, w, 2, 0xd03a3a).setOrigin(0, 0).setDepth(4));
     });
-    add('player', player.x, player.y, 5);
+    add(player.sprite, player.x, player.y, 5);
   }
 }
 
@@ -162,10 +179,10 @@ new Phaser.Game({
 });
 
 document.querySelectorAll('#dpad button').forEach((b) => {
-  const d = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0], wait: [0, 0] }[b.dataset.dir];
+  const d = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0], wait: [0, 0], ul: [-1, -1], ur: [1, -1], dl: [-1, 1], dr: [1, 1] }[b.dataset.dir];
   b.addEventListener('click', () => act(...d));
 });
 $('spellBtn').onclick = cast;
 $('bagBtn').onclick = () => { if (!gameOver) { renderInventory(); $('inventory').classList.remove('hidden'); } };
 $('closeBag').onclick = () => $('inventory').classList.add('hidden');
-$('msgBtn').onclick = startGame;
+$('msgBtn').onclick = chooseClass;

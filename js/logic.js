@@ -8,17 +8,27 @@ const ENEMY_TYPES = {
   boss:     { name: 'Dungeon Lord', hp: 45, atk: 8, xp: 100, sprite: 'boss' }
 };
 
+const CLASSES = {
+  fighter: { name: 'Fighter', desc: 'Tough, great with swords', sprite: 'fighter', hp: 26, mp: 4, atk: 4, weapon: 'sword' },
+  archer:  { name: 'Archer',  desc: 'Nimble, great with bows',   sprite: 'archer',  hp: 20, mp: 6, atk: 3, weapon: 'bow' },
+  wizard:  { name: 'Wizard',  desc: 'Frail, great with wands',   sprite: 'wizard',  hp: 16, mp: 12, atk: 2, weapon: 'wand' }
+};
+const WEAPON_MATCH = 4, WEAPON_OFF = 1;
+
 const ITEM_TYPES = {
   potion: { name: 'Health Potion', sprite: 'potion', desc: 'Restore 15 HP' },
   mana:   { name: 'Mana Potion',   sprite: 'mana',   desc: 'Restore 10 MP' },
-  sword:  { name: 'Sword',         sprite: 'sword',  desc: '+2 ATK (equip)' },
+  sword:  { name: 'Sword',         sprite: 'sword',  desc: '+4 ATK for Fighter, +1 others (equip)' },
+  bow:    { name: 'Bow',           sprite: 'bow',    desc: '+4 ATK for Archer, +1 others (equip)' },
+  wand:   { name: 'Wand',          sprite: 'wand',   desc: '+4 ATK & spell for Wizard, +1 others (equip)' },
   armor:  { name: 'Armor',         sprite: 'armor',  desc: '+1 DEF (equip)' }
 };
 
 const rnd = (n) => Math.floor(Math.random() * n);
 
-function newPlayer() {
-  return { x: 1, y: 1, hp: 20, maxHp: 20, mp: 8, maxMp: 8, level: 1, xp: 0, baseAtk: 3, weapon: 0, armor: 0, inv: [], turn: 0 };
+function newPlayer(cls) {
+  const c = CLASSES[cls] || CLASSES.fighter;
+  return { cls: CLASSES[cls] ? cls : 'fighter', sprite: c.sprite, x: 1, y: 1, hp: c.hp, maxHp: c.hp, mp: c.mp, maxMp: c.mp, level: 1, xp: 0, baseAtk: c.atk, weapon: 0, spellBonus: 0, armor: 0, inv: [], turn: 0 };
 }
 const playerAtk = (p) => p.baseAtk + p.weapon;
 const playerDef = (p) => p.armor;
@@ -81,7 +91,7 @@ function generateLevel(floor) {
     }
 
     const items = [];
-    const itemPool = ['potion', 'potion', 'mana', 'sword', 'armor'];
+    const itemPool = ['potion', 'potion', 'mana', 'sword', 'bow', 'wand', 'armor'];
     const ic = 2 + rnd(2);
     for (let i = 0; i < ic; i++) {
       const pos = pick(2);
@@ -154,7 +164,7 @@ function castSpell(p, lv) {
   const msgs = [];
   if (p.mp < SPELL_COST) return { acted: false, msgs: ['Not enough mana.'] };
   p.mp -= SPELL_COST;
-  const dmg = 4 + p.level * 2;
+  const dmg = 4 + p.level * 2 + (p.spellBonus || 0);
   const targets = lv.enemies.filter((e) => Math.abs(e.x - p.x) + Math.abs(e.y - p.y) <= 3);
   if (!targets.length) msgs.push('The flames fizzle out.');
   targets.forEach((e) => { msgs.push('Fire burns ' + e.name + ' for ' + dmg + '.'); damageEnemy(p, lv, e, dmg, msgs); });
@@ -167,7 +177,12 @@ function useItem(p, index) {
   let msg = '';
   if (type === 'potion') { const h = Math.min(15, p.maxHp - p.hp); p.hp += h; msg = 'Healed ' + h + ' HP.'; }
   else if (type === 'mana') { const m = Math.min(10, p.maxMp - p.mp); p.mp += m; msg = 'Restored ' + m + ' MP.'; }
-  else if (type === 'sword') { p.weapon += 2; msg = 'Equipped sword. ATK +2.'; }
+  else if (type === 'sword' || type === 'bow' || type === 'wand') {
+    const b = CLASSES[p.cls] && CLASSES[p.cls].weapon === type ? WEAPON_MATCH : WEAPON_OFF;
+    p.weapon += b;
+    if (type === 'wand') p.spellBonus += b;
+    msg = 'Equipped ' + ITEM_TYPES[type].name.toLowerCase() + '. ATK +' + b + (b === WEAPON_MATCH ? ' (mastery!)' : '') + (type === 'wand' ? ', spell +' + b : '') + '.';
+  }
   else if (type === 'armor') { p.armor += 1; msg = 'Equipped armor. DEF +1.'; }
   p.inv.splice(index, 1);
   return { used: true, msg };
@@ -208,5 +223,5 @@ function regen(p) {
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { generateLevel, newPlayer, playerMove, castSpell, useItem, enemyTurn, regen, gainXp, MAP_W, MAP_H, MAX_FLOOR };
+  module.exports = { CLASSES, generateLevel, newPlayer, playerMove, castSpell, useItem, enemyTurn, regen, gainXp, MAP_W, MAP_H, MAX_FLOOR };
 }
