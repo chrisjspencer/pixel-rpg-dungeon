@@ -37,7 +37,12 @@ function chooseClass() {
   Object.keys(CLASSES).forEach((k) => {
     const b = document.createElement('button');
     b.textContent = CLASSES[k].name + ' - ' + CLASSES[k].desc;
-    b.onclick = () => { $('classSelect').classList.add('hidden'); startGame(k); };
+    b.onclick = () => {
+      $('classSelect').classList.add('hidden');
+      DungeonAudio.unlock();
+      DungeonAudio.startMusic();
+      startGame(k);
+    };
     list.appendChild(b);
   });
   $('classSelect').classList.remove('hidden');
@@ -64,23 +69,29 @@ function loadFloor() {
 function endTurn(result) {
   const msgs = result.msgs.slice();
   if (result.won) {
+    DungeonAudio.victory();
     log(msgs); updateHud(); scene.render(); gameOver = true;
     showMessage('Victory!', 'The Dungeon Lord has fallen. You conquered the dungeon!');
     return;
   }
   if (result.newFloor) {
+    DungeonAudio.stairs();
     floorNum++;
     player.hp = Math.min(player.maxHp, player.hp + 5);
     msgs.push('You descend to floor ' + floorNum + (floorNum === MAX_FLOOR ? ' - the Dungeon Lord awaits!' : '.'));
     loadFloor();
   } else {
-    msgs.push(...enemyTurn(player, level));
+    const enemyMsgs = enemyTurn(player, level);
+    msgs.push(...enemyMsgs);
+    if (enemyMsgs.some((msg) => msg.includes(' hits you for '))) DungeonAudio.hurt();
     regen(player);
   }
+  if (result.msgs.some((msg) => msg.startsWith('Picked up '))) DungeonAudio.pickup();
   log(msgs);
   updateHud();
   scene.render();
   if (player.hp <= 0) {
+    DungeonAudio.defeat();
     gameOver = true;
     showMessage('You died', 'Reached floor ' + floorNum + ', level ' + player.level + '.');
   }
@@ -90,7 +101,7 @@ function act(dx, dy) {
   if (gameOver || !$('inventory').classList.contains('hidden')) return;
   const r = playerMove(player, level, dx, dy);
   if (!r.acted) return;
-  if (r.hitX !== undefined) scene.flash(r.hitX, r.hitY);
+  if (r.hitX !== undefined) { scene.flash(r.hitX, r.hitY); DungeonAudio.attack(); }
   endTurn(r);
 }
 
@@ -98,6 +109,7 @@ function cast() {
   if (gameOver) return;
   const r = castSpell(player, level);
   if (!r.acted) { log(r.msgs); return; }
+  DungeonAudio.spell();
   r.targets.forEach(([x, y]) => scene.flash(x, y));
   endTurn(r);
 }
