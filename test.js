@@ -84,7 +84,7 @@ assert.strictEqual(p.level, 2);
 {
   const open = () => ({ map: Array.from({ length: 11 }, (_, y) => Array.from({ length: 15 }, (_, x) => (x === 0 || y === 0 || x === 14 || y === 10 ? 1 : 0))), enemies: [], items: [], floor: 1, stairs: null });
   const p = L.newPlayer('wizard'); p.baseAtk = 20; p.x = 1; p.y = 1;
-  const lv = open();
+  let lv = open();
   lv.enemies.push({ type: 'rat', name: 'Rat', x: 3, y: 1, hp: 100, maxHp: 100, atk: 1, xp: 1 });
   const mp = p.mp, hp = lv.enemies[0].hp;
   L.playerShoot(p, lv, 1, 0);
