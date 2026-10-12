@@ -87,10 +87,11 @@ assert.strictEqual(p.level, 2);
 {
   const open = () => ({ map: Array.from({ length: 11 }, (_, y) => Array.from({ length: 15 }, (_, x) => (x === 0 || y === 0 || x === 14 || y === 10 ? 1 : 0))), enemies: [], items: [], floor: 1, stairs: null });
   const p = L.newPlayer('wizard'), lv = open();
+  p.baseAtk = 10;
   lv.enemies.push({ type: 'rat', name: 'Rat', x: 2, y: 1, hp: 100, maxHp: 100, atk: 1, xp: 1 });
   const hp = lv.enemies[0].hp, mp = p.mp;
   L.playerMove(p, lv, 1, 0);
-  assert(lv.enemies[0].hp < hp - 1, 'wizard close attack deals full power');
+  assert(lv.enemies[0].hp <= hp - 9, 'wizard close attack deals full power');
   assert.strictEqual(p.mp, mp - 1, 'wizard close attack costs one mana');
   p.mp = 0;
   const noMana = L.playerShoot(p, lv, 1, 0);
