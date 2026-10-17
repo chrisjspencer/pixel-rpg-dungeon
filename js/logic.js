@@ -1,5 +1,5 @@
 // Pure game logic (no Phaser dependencies) so it is easy to reason about and test.
-const MAP_W = 15, MAP_H = 11, MAX_FLOOR = 5, INV_MAX = 8, SPELL_COST = 4, WIZARD_ATTACK_COST = 1;
+const MAP_W = 15, MAP_H = 11, BOSS_EVERY = 5, INV_MAX = 8, SPELL_COST = 4, FEAR_TURNS = 4, WIZARD_ATTACK_COST = 1;
 
 const ENEMY_TYPES = {
   rat:      { name: 'Rat',      hp: 5,  atk: 2,  xp: 4,  gold: 1,  sprite: 'rat' },
@@ -34,7 +34,33 @@ function newPlayer(cls) {
 }
 const playerAtk = (p) => p.baseAtk + p.weapon;
 const playerDef = (p) => p.armor;
-const xpNeeded = (p) => p.level * 10;
+const xpNeeded = (p) => 10 * p.level * p.level + 10;
+const isBossFloor = (floor) => floor % BOSS_EVERY === 0;
+const bossAlive = (lv) => lv.enemies.some((e) => e.type === 'boss');
+
+function addItem(p, type) {
+  const stack = p.inv.find((s) => s.type === type);
+  if (stack) { stack.count++; return true; }
+  if (p.inv.length >= INV_MAX) return false;
+  p.inv.push({ type, count: 1 });
+  return true;
+}
+
+function removeOne(p, index) {
+  const stack = p.inv[index];
+  if (!stack) return;
+  if (--stack.count <= 0) p.inv.splice(index, 1);
+}
+
+function dropItem(p, index) {
+  const stack = p.inv[index];
+  if (!stack) return { dropped: false, msg: '' };
+  removeOne(p, index);
+  return { dropped: true, msg: 'Dropped ' + ITEM_TYPES[stack.type].name + '.' };
+}
+
+// True if the player's class can use this weapon type.
+const canEquipWeapon = (p, type) => !!CLASSES[p.cls] && CLASSES[p.cls].weapon === type;
 
 // Returns the list of walkable cells reachable from (sx, sy) with their distance.
 function floodFill(map, sx, sy) {
@@ -76,16 +102,17 @@ function generateLevel(floor) {
       return { x, y };
     };
 
-    const isBoss = floor === MAX_FLOOR;
+    const isBoss = isBossFloor(floor);
     const far = cells.reduce((a, b) => (dist[b[0] + ',' + b[1]] > dist[a[0] + ',' + a[1]] ? b : a));
     used.add(far[0] + ',' + far[1]);
-    const stairs = isBoss ? null : { x: far[0], y: far[1] };
+    const stairs = { x: far[0], y: far[1] };
 
     const enemies = [];
     if (isBoss) {
-      enemies.push(makeEnemy('boss', far[0], far[1], floor));
+      const bossPos = pick(5);
+      if (bossPos) enemies.push(makeEnemy('boss', bossPos.x, bossPos.y, floor));
     }
-    const count = 2 + floor + rnd(2);
+    const count = Math.min(10, 2 + floor + rnd(2));
     const pool = floor === 1 ? ['rat', 'rat', 'bat'] : floor < 4 ? ['rat', 'bat', 'skeleton', 'goblin'] : ['bat', 'skeleton', 'goblin', 'goblin'];
     for (let i = 0; i < count; i++) {
       const pos = pick(5);
@@ -103,10 +130,15 @@ function generateLevel(floor) {
   }
 }
 
+// Monster level is random from 1 up to the dungeon floor + 1 (bosses are always floor + 1).
 function makeEnemy(type, x, y, floor) {
   const t = ENEMY_TYPES[type];
-  const scale = type === 'boss' ? 0 : floor - 1;
-  return { type, name: t.name, x, y, hp: t.hp + scale * 2, maxHp: t.hp + scale * 2, atk: t.atk + Math.floor(scale / 2), xp: t.xp + scale, gold: t.gold + scale, sprite: t.sprite };
+  const level = type === 'boss' ? floor + 1 : 1 + rnd(floor + 1);
+  const scale = level - 1;
+  const hp = t.hp + scale * (type === 'boss' ? 5 : 2);
+  const e = { type, level, name: t.name + ' Lv' + level, x, y, hp, maxHp: hp, atk: t.atk + Math.floor(scale / 2), xp: t.xp + scale * (type === 'boss' ? 10 : 1), gold: t.gold + scale * (type === 'boss' ? 5 : 1), sprite: t.sprite, frozen: 0 };
+  if (t.rangedAtk) e.rangedAtk = t.rangedAtk + Math.floor(scale / 2);
+  return e;
 }
 
 const inBounds = (lv, x, y) => lv.map[y] !== undefined && lv.map[y][x] === 0;
@@ -151,30 +183,36 @@ function playerMove(p, lv, dx, dy) {
     if (p.cls === 'archer') dmg = Math.max(1, Math.floor(dmg / 2));
     msgs.push('You hit ' + e.name + ' for ' + dmg + '.');
     damageEnemy(p, lv, e, dmg, msgs);
-    return { acted: true, msgs, hitX: nx, hitY: ny, won: lv.floor === MAX_FLOOR && !lv.enemies.some((x) => x.type === 'boss') };
+    return { acted: true, msgs, hitX: nx, hitY: ny };
   }
   p.x = nx; p.y = ny;
   const idx = lv.items.findIndex((i) => i.x === nx && i.y === ny);
   if (idx >= 0) {
-    if (p.inv.length < INV_MAX) {
+    if (addItem(p, lv.items[idx].type)) {
       const it = lv.items.splice(idx, 1)[0];
-      p.inv.push(it.type);
       msgs.push('Picked up ' + ITEM_TYPES[it.type].name + '.');
     } else msgs.push('Inventory full!');
   }
-  if (lv.stairs && lv.stairs.x === nx && lv.stairs.y === ny) return { acted: true, msgs, newFloor: true };
+  if (lv.stairs && lv.stairs.x === nx && lv.stairs.y === ny) {
+    if (bossAlive(lv)) msgs.push('The Dungeon Lord guards the stairs!');
+    else return { acted: true, msgs, newFloor: true };
+  }
   return { acted: true, msgs };
 }
 
 // Archer and wizard ranged attacks follow a straight line in any of 8 directions.
-function playerShoot(p, lv, dx, dy) {
+// With pierce (archer special, costs SPELL_COST MP) the arrow passes through every enemy in line.
+function playerShoot(p, lv, dx, dy, pierce) {
   const msgs = [];
   if ((p.cls !== 'archer' && p.cls !== 'wizard') || (dx === 0 && dy === 0)) return { acted: false, msgs };
+  if (pierce && p.cls !== 'archer') return { acted: false, msgs };
   if (!inBounds(lv, p.x + dx, p.y + dy)) return { acted: false, msgs };
   if (p.cls === 'wizard' && p.mp < WIZARD_ATTACK_COST) return { acted: false, msgs: ['Not enough mana to attack.'] };
+  if (pierce && p.mp < SPELL_COST) return { acted: false, msgs: ['Not enough mana.'] };
   if (p.cls === 'wizard') p.mp -= WIZARD_ATTACK_COST;
+  if (pierce) p.mp -= SPELL_COST;
   let x = p.x, y = p.y;
-  const shotPath = [];
+  const shotPath = [], hits = [];
   for (let d = 1; d <= PLAYER_RANGE; d++) {
     const nx = x + dx, ny = y + dy;
     if (!inBounds(lv, nx, ny)) break;
@@ -185,48 +223,60 @@ function playerShoot(p, lv, dx, dy) {
     let dmg = Math.max(1, playerAtk(p) + rnd(3) - 1);
     if (p.cls === 'archer' && d === 1) dmg = Math.max(1, Math.floor(dmg / 2));
     if (p.cls === 'wizard') dmg = Math.max(1, dmg - d + 1);
-    msgs.push((p.cls === 'wizard' ? 'Your bolt hits ' : 'Your arrow hits ') + e.name + ' for ' + dmg + '.');
+    msgs.push((p.cls === 'wizard' ? 'Your bolt hits ' : pierce ? 'Your piercing arrow hits ' : 'Your arrow hits ') + e.name + ' for ' + dmg + '.');
+    hits.push([x, y]);
     damageEnemy(p, lv, e, dmg, msgs);
-    return { acted: true, msgs, hitX: x, hitY: y, shotPath, won: lv.floor === MAX_FLOOR && !lv.enemies.some((q) => q.type === 'boss') };
+    if (!pierce) return { acted: true, msgs, hitX: x, hitY: y, shotPath, hits };
   }
+  if (hits.length) return { acted: true, msgs, hitX: hits[hits.length - 1][0], hitY: hits[hits.length - 1][1], shotPath, hits };
   msgs.push('Your arrow misses.');
-  return { acted: true, msgs, hitX: x, hitY: y, shotPath };
+  return { acted: true, msgs, hitX: x, hitY: y, shotPath, hits };
 }
 
-// Fire spell: hits every enemy within 3 tiles.
+// Fire spell (wizard only): hits every enemy within 3 tiles.
 function castSpell(p, lv) {
   const msgs = [];
+  if (p.cls !== 'wizard') return { acted: false, msgs: ['Only wizards can cast spells.'] };
   if (p.mp < SPELL_COST) return { acted: false, msgs: ['Not enough mana.'] };
   p.mp -= SPELL_COST;
-  const baseDamage = 4 + p.level * 2 + (p.spellBonus || 0);
-  const dmg = p.cls === 'wizard' ? baseDamage * 2 : baseDamage;
+  const dmg = (4 + p.level * 2 + (p.spellBonus || 0)) * 2;
   const targets = lv.enemies.filter((e) => Math.abs(e.x - p.x) + Math.abs(e.y - p.y) <= 3);
   if (!targets.length) msgs.push('The flames fizzle out.');
   targets.forEach((e) => { msgs.push('Fire burns ' + e.name + ' for ' + dmg + '.'); damageEnemy(p, lv, e, dmg, msgs); });
-  return { acted: true, msgs, targets: targets.map((e) => [e.x, e.y]), won: lv.floor === MAX_FLOOR && !lv.enemies.some((x) => x.type === 'boss') };
+  return { acted: true, msgs, targets: targets.map((e) => [e.x, e.y]) };
+}
+
+// Warrior (fighter) special: a war cry freezes every enemy in fear for 4 turns.
+function warCry(p, lv) {
+  if (p.cls !== 'fighter') return { acted: false, msgs: ['Only warriors can use a war cry.'] };
+  if (p.mp < SPELL_COST) return { acted: false, msgs: ['Not enough mana.'] };
+  p.mp -= SPELL_COST;
+  lv.enemies.forEach((e) => { e.frozen = FEAR_TURNS; });
+  return { acted: true, msgs: [lv.enemies.length ? 'Your war cry freezes all enemies in fear for ' + FEAR_TURNS + ' turns!' : 'Your war cry echoes through the dungeon.'], targets: lv.enemies.map((e) => [e.x, e.y]) };
 }
 
 function cashOutInventory(p) {
-  const gold = p.inv.reduce((total, type) => total + (ITEM_TYPES[type] ? ITEM_TYPES[type].gold : 0), 0);
+  const gold = p.inv.reduce((total, s) => total + (ITEM_TYPES[s.type] ? ITEM_TYPES[s.type].gold * s.count : 0), 0);
   p.inv = [];
   p.gold += gold;
   return gold;
 }
 
 function useItem(p, index) {
-  const type = p.inv[index];
+  const type = p.inv[index] && p.inv[index].type;
   if (!type) return { used: false, msg: '' };
   let msg = '';
   if (type === 'potion') { const h = Math.min(15, p.maxHp - p.hp); p.hp += h; msg = 'Healed ' + h + ' HP.'; }
   else if (type === 'mana') { const m = Math.min(10, p.maxMp - p.mp); p.mp += m; msg = 'Restored ' + m + ' MP.'; }
   else if (type === 'sword' || type === 'bow' || type === 'wand') {
-    const b = CLASSES[p.cls] && CLASSES[p.cls].weapon === type ? WEAPON_MATCH : WEAPON_OFF;
+    if (!canEquipWeapon(p, type)) return { used: false, msg: 'Your class cannot use a ' + ITEM_TYPES[type].name.toLowerCase() + '.' };
+    const b = WEAPON_MATCH;
     p.weapon += b;
     if (type === 'wand') p.spellBonus += b;
-    msg = 'Equipped ' + ITEM_TYPES[type].name.toLowerCase() + (b ? '. ATK +' + b + (type === 'wand' ? ', spell +' + b : '') : '. No class bonus.');
+    msg = 'Equipped ' + ITEM_TYPES[type].name.toLowerCase() + (b ? '. ATK +' + b + (type === 'wand' ? ', spell +' + b : '') : '');
   }
   else if (type === 'armor') { p.armor += 1; msg = 'Equipped armor. DEF +1.'; }
-  p.inv.splice(index, 1);
+  removeOne(p, index);
   return { used: true, msg };
 }
 
@@ -247,6 +297,7 @@ function clearShot(lv, from, to, range) {
 function enemyTurn(p, lv) {
   const msgs = [];
   for (const e of lv.enemies) {
+    if (e.frozen > 0) { e.frozen--; continue; }
     const dxToPlayer = Math.abs(e.x - p.x), dyToPlayer = Math.abs(e.y - p.y);
     const dist = dxToPlayer + dyToPlayer;
     const et = ENEMY_TYPES[e.type];
@@ -288,5 +339,5 @@ function regen(p) {
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { CLASSES, ITEM_TYPES, generateLevel, newPlayer, playerMove, playerShoot, castSpell, useItem, cashOutInventory, enemyTurn, regen, gainXp, MAP_W, MAP_H, MAX_FLOOR };
+  module.exports = { CLASSES, ITEM_TYPES, generateLevel, newPlayer, playerMove, playerShoot, castSpell, warCry, useItem, dropItem, addItem, canEquipWeapon, cashOutInventory, enemyTurn, regen, gainXp, isBossFloor, xpNeeded, MAP_W, MAP_H, BOSS_EVERY, INV_MAX };
 }

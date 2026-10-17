@@ -2,10 +2,12 @@
 const assert = require('assert');
 const L = require('./js/logic.js');
 
-for (let f = 1; f <= L.MAX_FLOOR; f++) {
+for (let f = 1; f <= 12; f++) {
   for (let i = 0; i < 50; i++) {
     const lv = L.generateLevel(f);
-    assert(f === L.MAX_FLOOR ? !lv.stairs : lv.stairs, 'stairs placement');
+    assert(lv.stairs, 'stairs placement');
+    assert.strictEqual(lv.enemies.some((e) => e.type === 'boss'), L.isBossFloor(f), 'boss every 5th floor');
+    lv.enemies.forEach((e) => assert(e.level >= 1 && e.level <= f + 1, 'monster level cap'));
     assert(lv.enemies.length > 0);
   }
 }
@@ -16,8 +18,7 @@ for (let g = 0; g < 200; g++) {
   let floor = 1, lv = L.generateLevel(floor);
   for (let t = 0; t < 500 && p.hp > 0; t++) {
     const d = [[0,1],[0,-1],[1,0],[-1,0],[1,1],[-1,-1],[1,-1],[-1,1]][Math.floor(Math.random() * 8)];
-    const r = t % 7 === 0 ? L.castSpell(p, lv) : L.playerMove(p, lv, d[0], d[1]);
-    if (r.won) break;
+    const r = t % 7 === 0 ? (p.cls === 'fighter' ? L.warCry(p, lv) : L.castSpell(p, lv)) : L.playerMove(p, lv, d[0], d[1]);
     if (p.inv.length) L.useItem(p, 0);
     if (r.newFloor) { lv = L.generateLevel(++floor); p.x = 1; p.y = 1; continue; }
     L.enemyTurn(p, lv); L.regen(p);
@@ -26,18 +27,18 @@ for (let g = 0; g < 200; g++) {
 }
 for (const c of Object.keys(L.CLASSES)) {
   const q = L.newPlayer(c);
-  q.inv.push(L.CLASSES[c].weapon);
+  L.addItem(q, L.CLASSES[c].weapon);
   L.useItem(q, 0);
   assert.strictEqual(q.weapon, 1, c + ' matching weapon bonus');
   if (c === 'wizard') assert.strictEqual(q.spellBonus, 1, 'wand spell bonus');
 }
 {
   const wizard = L.newPlayer('wizard');
-  wizard.inv.push('sword');
-  L.useItem(wizard, 0);
+  L.addItem(wizard, 'sword');
+  assert.strictEqual(L.useItem(wizard, 0).used, false);
   assert.strictEqual(wizard.weapon, 0, 'nonmatching weapon has no attack bonus');
   const fighter = L.newPlayer('fighter');
-  fighter.inv.push('wand');
+  L.addItem(fighter, 'wand');
   L.useItem(fighter, 0);
   assert.strictEqual(fighter.weapon, 0, 'nonmatching wand has no attack bonus');
   assert.strictEqual(fighter.spellBonus, 0, 'nonmatching wand adds no spell damage');
@@ -56,7 +57,7 @@ for (const c of Object.keys(L.CLASSES)) {
   assert(msgs.some((msg) => msg.startsWith('Rat hits you for ')) && q.hp < q.maxHp, 'diagonal enemy attack');
 }
 const p = L.newPlayer();
-L.gainXp(p, 10);
+L.gainXp(p, L.xpNeeded(p));
 assert.strictEqual(p.level, 2);
 
 // Archer: shots deal half damage when adjacent, full at range; ranged enemies shoot.
@@ -114,11 +115,37 @@ assert.strictEqual(p.level, 2);
 {
   const map = Array.from({ length: 11 }, (_, y) => Array.from({ length: 15 }, (_, x) => (x === 0 || y === 0 || x === 14 || y === 10 ? 1 : 0)));
   const p = L.newPlayer('fighter'), lv = { map, enemies: [{ type: 'rat', name: 'Rat', x: 2, y: 1, hp: 1, xp: 4, gold: 2 }], floor: 1 };
-  p.inv.push('potion', 'wand');
+  L.addItem(p, 'potion'); L.addItem(p, 'potion'); L.addItem(p, 'wand');
   L.playerMove(p, lv, 1, 0);
   assert.strictEqual(p.gold, 2, 'enemy kill awards gold');
-  assert.strictEqual(L.cashOutInventory(p), 15, 'remaining inventory converts to gold');
-  assert.strictEqual(p.gold, 17, 'cash-out adds to player gold');
+  assert.strictEqual(L.cashOutInventory(p), 20, 'remaining inventory converts to gold');
+  assert.strictEqual(p.gold, 22, 'cash-out adds to player gold');
   assert.strictEqual(p.inv.length, 0, 'cash-out removes sold inventory');
+}
+{
+  const p = L.newPlayer('fighter');
+  L.addItem(p, 'potion'); L.addItem(p, 'potion');
+  assert.strictEqual(p.inv.length, 1); assert.strictEqual(p.inv[0].count, 2, 'items stack');
+  L.dropItem(p, 0); assert.strictEqual(p.inv[0].count, 1);
+  L.dropItem(p, 0); assert.strictEqual(p.inv.length, 0);
+  assert.strictEqual(L.castSpell(p, { enemies: [] }).acted, false, 'only wizards cast');
+}
+{
+  const open = () => ({ map: Array.from({ length: 11 }, (_, y) => Array.from({ length: 15 }, (_, x) => (x === 0 || y === 0 || x === 14 || y === 10 ? 1 : 0))), enemies: [], items: [], floor: 1, stairs: null });
+  const a = L.newPlayer('archer'); a.baseAtk = 10; a.x = 1; a.y = 1;
+  const lv = open();
+  [3, 5].forEach((x) => lv.enemies.push({ type: 'rat', name: 'Rat', x, y: 1, hp: 100, maxHp: 100, atk: 1, xp: 1 }));
+  const mp = a.mp;
+  const r = L.playerShoot(a, lv, 1, 0, true);
+  assert(lv.enemies.every((e) => e.hp < 100) && r.hits.length === 2, 'piercing shot hits all in line');
+  assert.strictEqual(a.mp, mp - 4, 'piercing shot costs mana');
+  const f = L.newPlayer('fighter'); f.x = 1; f.y = 1;
+  lv.enemies.push({ type: 'rat', name: 'Rat', x: 2, y: 1, hp: 100, maxHp: 100, atk: 5, xp: 1 });
+  L.warCry(f, lv);
+  const hp = f.hp;
+  for (let i = 0; i < 4; i++) L.enemyTurn(f, lv);
+  assert.strictEqual(f.hp, hp, 'frozen enemies do nothing for 4 turns');
+  L.enemyTurn(f, lv);
+  assert(f.hp < hp, 'enemies thaw after 4 turns');
 }
 console.log('all tests passed');

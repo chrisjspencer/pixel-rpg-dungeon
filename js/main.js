@@ -1,7 +1,7 @@
 const TILE = 16;
 const $ = (id) => document.getElementById(id);
 
-let player, level, floorNum, gameOver, scene, aiming = false, resolvingAction = false;
+let player, level, floorNum, gameOver, scene, aiming = false, pierceAim = false, resolvingAction = false;
 let logLines = [];
 
 function log(msgs) {
@@ -11,7 +11,7 @@ function log(msgs) {
 
 function updateHud() {
   const p = player;
-  $('floor').textContent = 'Floor ' + floorNum + '/' + MAX_FLOOR;
+  $('floor').textContent = 'Floor ' + floorNum;
   $('lvl').textContent = 'Lv ' + p.level;
   $('stats').textContent = 'ATK ' + playerAtk(p) + ' DEF ' + playerDef(p);
   $('gold').textContent = 'Gold ' + p.gold;
@@ -21,8 +21,13 @@ function updateHud() {
   $('hpText').textContent = 'HP ' + p.hp + '/' + p.maxHp;
   $('mpText').textContent = 'MP ' + p.mp + '/' + p.maxMp;
   $('bagCount').textContent = p.inv.length + '/' + INV_MAX;
-  $('spellBtn').disabled = p.mp < SPELL_COST;
+  const sb = $('spellBtn'), ab = ABILITIES[p.cls];
+  sb.innerHTML = ab.label + '<br><small>' + SPELL_COST + ' MP</small>';
+  sb.disabled = p.mp < SPELL_COST;
+  sb.classList.toggle('aim', pierceAim);
 }
+
+const ABILITIES = { wizard: { label: '🔥 Spell' }, archer: { label: '🏹 Pierce' }, fighter: { label: '📣 War Cry' } };
 
 function showMessage(title, text) {
   $('msgTitle').textContent = title;
@@ -71,20 +76,11 @@ function loadFloor() {
 // Finish a player action: enemies act, then check win/lose.
 function endTurn(result) {
   const msgs = result.msgs.slice();
-  if (result.won) {
-    DungeonAudio.victory();
-    const itemGold = cashOutInventory(player);
-    if (itemGold) msgs.push('Remaining items sold for ' + itemGold + ' gold.');
-    setAiming(false);
-    log(msgs); updateHud(); scene.render(); gameOver = true;
-    showMessage('Victory!', 'The Dungeon Lord has fallen. You conquered the dungeon! Total gold: ' + player.gold + '.');
-    return;
-  }
   if (result.newFloor) {
     DungeonAudio.stairs();
     floorNum++;
     player.hp = Math.min(player.maxHp, player.hp + 5);
-    msgs.push('You descend to floor ' + floorNum + (floorNum === MAX_FLOOR ? ' - the Dungeon Lord awaits!' : '.'));
+    msgs.push('You descend to floor ' + floorNum + (isBossFloor(floorNum) ? ' - a Dungeon Lord awaits!' : '.'));
     loadFloor();
   } else {
     const enemyMsgs = enemyTurn(player, level);
@@ -107,8 +103,9 @@ function endTurn(result) {
   }
 }
 
-function setAiming(on) {
+function setAiming(on, pierce) {
   aiming = on;
+  pierceAim = on && !!pierce;
   document.querySelectorAll('#dpad button').forEach((b) => {
     const active = on && b.dataset.dir !== 'wait';
     b.classList.toggle('aim', active);
@@ -119,17 +116,19 @@ function setAiming(on) {
 function act(dx, dy) {
   if (gameOver || resolvingAction || !$('inventory').classList.contains('hidden')) return;
   if (aiming) {
+    const pierce = pierceAim;
     setAiming(false);
     if (dx === 0 && dy === 0) {
+      if (pierce) { log(['Piercing shot cancelled.']); updateHud(); return; }
       endTurn(playerMove(player, level, 0, 0));
       return;
     }
-    const s = playerShoot(player, level, dx, dy);
+    const s = playerShoot(player, level, dx, dy, pierce);
     if (!s.acted) { log(s.msgs); return; }
     resolvingAction = true;
     scene.animateProjectile(s.shotPath, player.cls).then(() => {
       resolvingAction = false;
-      if (s.hitX !== undefined) scene.flash(s.hitX, s.hitY);
+      (s.hits || []).forEach(([hx, hy]) => scene.flash(hx, hy));
       DungeonAudio.attack();
       endTurn(s);
     });
@@ -149,27 +148,61 @@ function act(dx, dy) {
 
 function cast() {
   if (gameOver || resolvingAction) return;
-  const r = castSpell(player, level);
+  if (player.cls === 'archer') {
+    if (pierceAim) { setAiming(false); log(['Piercing shot cancelled.']); updateHud(); return; }
+    if (player.mp < SPELL_COST) { log(['Not enough mana.']); return; }
+    setAiming(true, true);
+    log(['Piercing shot: press a direction to fire.']);
+    updateHud();
+    return;
+  }
+  const r = player.cls === 'fighter' ? warCry(player, level) : castSpell(player, level);
   if (!r.acted) { log(r.msgs); return; }
   DungeonAudio.spell();
   r.targets.forEach(([x, y]) => scene.flash(x, y));
   endTurn(r);
 }
 
-function renderInventory() {
+function renderInventory(selected) {
   const list = $('invList');
   list.innerHTML = '';
-  if (!player.inv.length) list.innerHTML = '<div class="empty">Empty</div>';
-  player.inv.forEach((type, i) => {
-    const b = document.createElement('button');
-    b.textContent = ITEM_TYPES[type].name + ' - ' + ITEM_TYPES[type].desc;
-    b.onclick = () => {
-      const r = useItem(player, i);
-      if (r.used) {
-        $('inventory').classList.add('hidden');
-        endTurn({ msgs: [r.msg] });
-      }
+  if (selected !== undefined && player.inv[selected]) {
+    const type = player.inv[selected].type, it = ITEM_TYPES[type];
+    const isWeapon = type === 'sword' || type === 'bow' || type === 'wand';
+    const title = document.createElement('div');
+    title.textContent = it.name + ' x' + player.inv[selected].count + ' - ' + it.desc;
+    list.appendChild(title);
+    if (!isWeapon || canEquipWeapon(player, type)) {
+      const use = document.createElement('button');
+      use.textContent = type === 'armor' || isWeapon ? 'Equip' : 'Use';
+      use.onclick = () => {
+        const r = useItem(player, selected);
+        if (r.used) {
+          $('inventory').classList.add('hidden');
+          endTurn({ msgs: [r.msg] });
+        }
+      };
+      list.appendChild(use);
+    }
+    const drop = document.createElement('button');
+    drop.textContent = 'Drop';
+    drop.onclick = () => {
+      const r = dropItem(player, selected);
+      log([r.msg]); updateHud();
+      renderInventory();
     };
+    list.appendChild(drop);
+    const back = document.createElement('button');
+    back.textContent = 'Exit';
+    back.onclick = () => renderInventory();
+    list.appendChild(back);
+    return;
+  }
+  if (!player.inv.length) list.innerHTML = '<div class="empty">Empty</div>';
+  player.inv.forEach((stack, i) => {
+    const b = document.createElement('button');
+    b.textContent = ITEM_TYPES[stack.type].name + ' x' + stack.count + ' - ' + ITEM_TYPES[stack.type].desc;
+    b.onclick = () => renderInventory(i);
     list.appendChild(b);
   });
 }
