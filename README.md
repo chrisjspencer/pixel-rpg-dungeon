@@ -5,13 +5,13 @@ A small turn-based pixel dungeon crawler built with **Phaser 3** and vanilla Jav
 [Play the game](https://chrisjspencer.github.io/pixel-rpg-dungeon/)
 
 ## How to play
-Descend through 5 floors and defeat the **Dungeon Lord** on floor 5.
+The dungeon is endless. A **Dungeon Lord** guards the stairs on every 5th floor. Monster levels are random, up to the floor number + 1.
 
 - **Move / attack:** D-pad buttons, swipe on the map, or arrow keys / WASD. Walk into an enemy to attack.
 - **Audio:** synthesized dungeon music and sound effects begin after you choose a hero.
 - **Wait:** the centre button (or Space). Every action is a turn; enemies move after you.
-- **Spell (🔥):** costs 4 MP, burns all enemies within 3 tiles (key `F`).
-- **Bag (🎒):** tap an item to use or equip it (key `I`). Potions heal HP/MP, swords add ATK, armor adds DEF. Walk over items to pick them up (max 8).
+- **Special button (key `F`, 4 MP):** Wizard 🔥 spell burns all enemies within 3 tiles (only wizards cast spells); Archer 🏹 piercing shot, then pick a direction, hits every enemy in line; Warrior 📣 war cry freezes all enemies for 4 turns.
+- **Bag (🎒):** identical items stack with a counter. Tap an item for options: Use/Equip (weapons only if your class can use them), Drop, or Exit (key `I`). Potions heal HP/MP, armor adds DEF. Walk over items to pick them up (max 8 stacks).
 - **Stairs:** the white stair tile takes you to the next floor (+5 HP).
 - **Level up:** defeating enemies grants XP, which raises max HP/MP and ATK and fully heals you.
 
